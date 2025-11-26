@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Gambia Election Results Collection System">
+    <meta name="theme-color" content="#1976d2">
+    <title>Gambia Election Results</title>
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app">
+        <!-- Header/Navigation -->
+        <header id="header" class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <button id="menuBtn" class="menu-btn" aria-label="Menu">
+                        <span class="menu-icon"></span>
+                    </button>
+                    <h1 class="app-title">Election Results</h1>
+                </div>
+                <div class="header-right">
+                    <span id="userInfo" class="user-info"></span>
+                    <button id="refreshBtn" class="btn-icon" aria-label="Refresh" style="display: none;" title="Reload current page data">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
+                    <button id="logoutBtn" class="btn-icon" aria-label="Logout" style="display: none;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Side Navigation -->
+        <nav id="sidenav" class="sidenav">
+            <div class="sidenav-content">
+                <div class="sidenav-header">
+                    <h2>Menu</h2>
+                    <button id="closeSidenavBtn" class="btn-icon" aria-label="Close menu">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <ul id="navMenu" class="nav-menu">
+                    <!-- Nav items will be dynamically populated -->
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Overlay -->
+        <div id="overlay" class="overlay"></div>
+
+        <!-- Main Content -->
+        <main id="main" class="main">
+            <div id="content" class="content">
+                <!-- Content will be dynamically loaded here -->
+            </div>
+        </main>
+
+        <!-- Loading Spinner -->
+        <div id="loader" class="loader" style="display: none;">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>
+

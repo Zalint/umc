@@ -1,0 +1,33 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vscode/
+*.swp
+*.swo
+coverage/
+dist/
+
+# Uploads (keep folder structure, ignore uploaded files)
+uploads/documents/*
+!uploads/documents/.gitkeep
+
+# Database
+*.sql.backup
+*.sql.bak
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+
+# Temporary files
+*.tmp
+*.temp
+brouillon
+
