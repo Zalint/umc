@@ -6,6 +6,10 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+// Detect if we're in production (Render or other cloud providers require SSL)
+const isProduction = process.env.NODE_ENV === 'production' || 
+                     (process.env.DB_HOST && process.env.DB_HOST.includes('render.com'));
+
 // Create PostgreSQL connection pool
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -16,6 +20,10 @@ const pool = new Pool({
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
   connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+  // SSL configuration for production (Render requires SSL)
+  ssl: isProduction ? {
+    rejectUnauthorized: false // Accept self-signed certificates
+  } : false
 });
 
 // Test database connection

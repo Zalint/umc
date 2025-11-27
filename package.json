@@ -10,6 +10,7 @@
     "stop": "taskkill /F /IM node.exe",
     "db:schema": "psql $DATABASE_URL -f db/schema.sql",
     "db:seed": "node db/seed.js",
+    "db:seed-prod": "node db/seed-users-prod.js",
     "db:import-voters": "node db/import-registered-voters.js",
     "db:update-passwords": "node db/update-passwords.js",
     "db:add-sessions": "node db/add-session-tracking.js",
