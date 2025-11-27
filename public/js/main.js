@@ -148,14 +148,21 @@ function showAccountDeactivatedPage() {
 
 function toggleSidenav() {
     const sidenav = document.getElementById('sidenav');
-    const overlay = document.getElementById('overlay');
-    sidenav.classList.toggle('active');
-    overlay.classList.toggle('active');
+    const main = document.getElementById('main');
+    sidenav.classList.toggle('sidenav-hidden');
+    main.classList.toggle('sidenav-hidden');
+    
+    // Save preference to localStorage
+    const isHidden = sidenav.classList.contains('sidenav-hidden');
+    localStorage.setItem('sidenavHidden', isHidden);
 }
 
 function closeSidenav() {
-    document.getElementById('sidenav').classList.remove('active');
-    document.getElementById('overlay').classList.remove('active');
+    // On mobile, close the sidebar
+    if (window.innerWidth <= 768) {
+        const sidenav = document.getElementById('sidenav');
+        sidenav.classList.add('sidenav-hidden');
+    }
 }
 
 // ============================================
@@ -204,16 +211,28 @@ function checkAuth() {
 // ============================================
 function initializeNavigation() {
     const menuBtn = document.getElementById('menuBtn');
-    const closeSidenavBtn = document.getElementById('closeSidenavBtn');
-    const overlay = document.getElementById('overlay');
     const logoutBtn = document.getElementById('logoutBtn');
     const refreshBtn = document.getElementById('refreshBtn');
     
     menuBtn.addEventListener('click', toggleSidenav);
-    closeSidenavBtn.addEventListener('click', closeSidenav);
-    overlay.addEventListener('click', closeSidenav);
     logoutBtn.addEventListener('click', logout);
     refreshBtn.addEventListener('click', refreshCurrentView);
+    
+    // Restore sidenav state from localStorage
+    const sidenavHidden = localStorage.getItem('sidenavHidden') === 'true';
+    const sidenav = document.getElementById('sidenav');
+    const main = document.getElementById('main');
+    
+    if (sidenavHidden) {
+        sidenav.classList.add('sidenav-hidden');
+        main.classList.add('sidenav-hidden');
+    }
+    
+    // On mobile, start with sidebar hidden
+    if (window.innerWidth <= 768) {
+        sidenav.classList.add('sidenav-hidden');
+        main.classList.add('sidenav-hidden');
+    }
     
     // Update user info
     const userInfo = document.getElementById('userInfo');
@@ -257,13 +276,11 @@ function buildMenu() {
             { label: 'Dashboard', view: 'dashboard', icon: iconDashboard() },
             { label: 'My Stations', view: 'my-stations', icon: iconMap() },
             { label: 'Submit Results', view: 'submit', icon: iconEdit() },
-            { label: 'View Results', view: 'results', icon: iconChart() },
-            { label: 'Projection Results', view: 'projection-results', icon: iconTrendUp() }
+            { label: 'View Results', view: 'results', icon: iconChart() }
         ],
         reader: [
             { label: 'Dashboard', view: 'dashboard', icon: iconDashboard() },
-            { label: 'View Results', view: 'results', icon: iconChart() },
-            { label: 'Projection Results', view: 'projection-results', icon: iconTrendUp() }
+            { label: 'View Results', view: 'results', icon: iconChart() }
         ]
     };
     

@@ -15,8 +15,12 @@
         <header id="header" class="header">
             <div class="header-content">
                 <div class="header-left">
-                    <button id="menuBtn" class="menu-btn" aria-label="Menu">
-                        <span class="menu-icon"></span>
+                    <button id="menuBtn" class="menu-btn" aria-label="Toggle Menu">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
                     </button>
                     <h1 class="app-title">Election Results</h1>
                 </div>
@@ -41,25 +45,16 @@
         </header>
 
         <!-- Side Navigation -->
-        <nav id="sidenav" class="sidenav">
+        <nav id="sidenav" class="sidenav sidenav-open">
             <div class="sidenav-content">
                 <div class="sidenav-header">
                     <h2>Menu</h2>
-                    <button id="closeSidenavBtn" class="btn-icon" aria-label="Close menu">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
                 </div>
                 <ul id="navMenu" class="nav-menu">
                     <!-- Nav items will be dynamically populated -->
                 </ul>
             </div>
         </nav>
-
-        <!-- Overlay -->
-        <div id="overlay" class="overlay"></div>
 
         <!-- Main Content -->
         <main id="main" class="main">

@@ -114,11 +114,13 @@ body {
 .main {
     flex: 1;
     margin-top: var(--header-height);
+    margin-left: 260px;
     padding: var(--spacing-md);
-    max-width: 1200px;
-    width: 100%;
-    margin-left: auto;
-    margin-right: auto;
+    transition: margin-left var(--transition);
+}
+
+.main.sidenav-hidden {
+    margin-left: 0;
 }
 
 .content {
@@ -139,19 +141,19 @@ body {
 /* Side Navigation */
 .sidenav {
     position: fixed;
-    top: 0;
-    left: -280px;
-    width: 280px;
-    height: 100vh;
+    top: var(--header-height);
+    left: 0;
+    width: 260px;
+    height: calc(100vh - var(--header-height));
     background-color: var(--surface-color);
-    box-shadow: var(--shadow-lg);
-    transition: left var(--transition);
-    z-index: 1100;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    transition: transform var(--transition);
+    z-index: 900;
     overflow-y: auto;
 }
 
-.sidenav.active {
-    left: 0;
+.sidenav-hidden {
+    transform: translateX(-100%);
 }
 
 .sidenav-content {
@@ -201,21 +203,7 @@ body {
 
 /* Overlay */
 .overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0,0,0,0.5);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--transition), visibility var(--transition);
-    z-index: 1050;
-}
-
-.overlay.active {
-    opacity: 1;
-    visibility: visible;
+    display: none;
 }
 
 /* ============================================
@@ -908,6 +896,38 @@ button {
     .modal-header,
     .modal-body {
         padding: var(--spacing-md);
+    }
+    
+    /* Mobile sidenav - overlay mode */
+    .sidenav {
+        top: 0;
+        height: 100vh;
+        z-index: 1100;
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .sidenav-hidden {
+        transform: translateX(-100%);
+    }
+    
+    .main {
+        margin-left: 0 !important;
+    }
+    
+    /* Show overlay on mobile when sidenav is open */
+    .overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1050;
+    }
+    
+    .sidenav:not(.sidenav-hidden) ~ .overlay {
+        display: block;
     }
 }
 
