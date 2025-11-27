@@ -11,12 +11,15 @@
     "db:schema": "psql $DATABASE_URL -f db/schema.sql",
     "db:seed": "node db/seed.js",
     "db:seed-prod": "node db/seed-users-prod.js",
+    "db:set-passwords": "node db/set-prod-passwords.js",
     "db:import-voters": "node db/import-registered-voters.js",
     "db:update-passwords": "node db/update-passwords.js",
     "db:add-sessions": "node db/add-session-tracking.js",
     "db:add-comments": "node db/add-station-comments.js",
     "test:fill": "node db/fill-fake-data.js",
-    "test:clear": "node db/clear-fake-data.js"
+    "test:clear": "node db/clear-fake-data.js",
+    "test:fill-pvt": "node db/fill-pvt-fake-data.js",
+    "test:clear-pvt": "node db/clear-pvt-fake-data.js"
   },
   "keywords": ["election", "gambia", "results"],
   "author": "Unite Movement Gambia",
