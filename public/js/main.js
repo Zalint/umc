@@ -386,8 +386,17 @@ function showLoginView() {
                     </div>
                     <div class="form-group">
                         <label class="form-label">Password</label>
-                        <input type="password" class="form-control" id="loginPassword" required 
-                               autocomplete="current-password" placeholder="Enter your password">
+                        <div style="position: relative;">
+                            <input type="password" class="form-control" id="loginPassword" required 
+                                   autocomplete="current-password" placeholder="Enter your password"
+                                   style="padding-right: 2.5rem;">
+                            <button type="button" onclick="togglePasswordVisibility('loginPassword', 'loginPasswordToggle')" 
+                                    id="loginPasswordToggle"
+                                    style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); 
+                                           border: none; background: none; cursor: pointer; padding: 0.25rem; font-size: 1.2rem;">
+                                👁️
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary btn-full">Login</button>
                 </form>
@@ -1659,7 +1668,15 @@ async function showUsersView() {
                         </div>
                         <div class="form-group">
                             <label class="form-label">Password</label>
-                            <input type="password" class="form-control" name="password" required minlength="6">
+                            <div style="position: relative;">
+                                <input type="password" class="form-control" name="password" id="createUserPassword" required minlength="6" style="padding-right: 2.5rem;">
+                                <button type="button" onclick="togglePasswordVisibility('createUserPassword', 'createUserPasswordToggle')" 
+                                        id="createUserPasswordToggle"
+                                        style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); 
+                                               border: none; background: none; cursor: pointer; padding: 0.25rem; font-size: 1.2rem;">
+                                    👁️
+                                </button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Role</label>
@@ -1711,12 +1728,21 @@ async function showUsersView() {
                                             ${isCurrentUser ? '-' : `
                                                 <button class="btn btn-${u.is_active ? 'danger' : 'success'} btn-sm" 
                                                         onclick="toggleUserStatus(${u.id}, ${u.is_active}, '${u.full_name}')"
-                                                        style="margin-right: 0.5rem;">
-                                                    ${u.is_active ? 'Deactivate' : 'Activate'}
+                                                        style="margin-right: 0.5rem; margin-bottom: 0.5rem;">
+                                                    ${u.is_active ? 'DEACTIVATE' : 'ACTIVATE'}
                                                 </button>
+                                                ${state.user.role === 'admin' ? `
+                                                    <button class="btn btn-warning btn-sm" 
+                                                            onclick="showResetPasswordModal(${u.id}, '${u.full_name}')"
+                                                            style="margin-right: 0.5rem; margin-bottom: 0.5rem;">
+                                                        RESET PASSWORD
+                                                    </button>
+                                                ` : ''}
                                                 ${u.role === 'member' ? `
-                                                    <button class="btn btn-outline btn-sm" onclick="showAssignMemberModal(${u.id}, '${u.full_name}')">
-                                                        Assign Area
+                                                    <button class="btn btn-outline btn-sm" 
+                                                            onclick="showAssignMemberModal(${u.id}, '${u.full_name}')"
+                                                            style="margin-bottom: 0.5rem;">
+                                                        ASSIGN AREA
                                                     </button>
                                                 ` : ''}
                                             `}
@@ -1753,6 +1779,97 @@ async function showUsersView() {
     } catch (error) {
         showToast('Failed to load users', 'error');
     }
+}
+
+// Toggle password visibility
+function togglePasswordVisibility(inputId, buttonId) {
+    const input = document.getElementById(inputId);
+    const button = document.getElementById(buttonId);
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        button.textContent = '🙈'; // Hide icon
+    } else {
+        input.type = 'password';
+        button.textContent = '👁️'; // Show icon
+    }
+}
+
+// Show reset password modal
+function showResetPasswordModal(userId, userName) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-backdrop';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Reset Password: ${userName}</h3>
+                <button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="resetPasswordForm">
+                    <div class="form-group">
+                        <label class="form-label">New Password</label>
+                        <div style="position: relative;">
+                            <input type="password" class="form-control" id="resetNewPassword" name="newPassword" 
+                                   required minlength="6" placeholder="Enter new password"
+                                   style="padding-right: 2.5rem;">
+                            <button type="button" onclick="togglePasswordVisibility('resetNewPassword', 'resetPasswordToggle')" 
+                                    id="resetPasswordToggle"
+                                    style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); 
+                                           border: none; background: none; cursor: pointer; padding: 0.25rem; font-size: 1.2rem;">
+                                👁️
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">Minimum 6 characters</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password</label>
+                        <div style="position: relative;">
+                            <input type="password" class="form-control" id="resetConfirmPassword" name="confirmPassword" 
+                                   required minlength="6" placeholder="Confirm new password"
+                                   style="padding-right: 2.5rem;">
+                            <button type="button" onclick="togglePasswordVisibility('resetConfirmPassword', 'resetConfirmPasswordToggle')" 
+                                    id="resetConfirmPasswordToggle"
+                                    style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); 
+                                           border: none; background: none; cursor: pointer; padding: 0.25rem; font-size: 1.2rem;">
+                                👁️
+                            </button>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">Reset Password</button>
+                        <button type="button" class="btn btn-outline" onclick="this.closest('.modal-backdrop').remove()" style="flex: 1;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Handle form submission
+    document.getElementById('resetPasswordForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newPassword = document.getElementById('resetNewPassword').value;
+        const confirmPassword = document.getElementById('resetConfirmPassword').value;
+        
+        if (newPassword !== confirmPassword) {
+            showToast('Passwords do not match!', 'error');
+            return;
+        }
+        
+        try {
+            await api.put(`/users/${userId}/reset-password`, { newPassword });
+            showToast('Password reset successfully!', 'success');
+            modal.remove();
+            showUsersView(); // Reload users
+        } catch (error) {
+            showToast(error.message || 'Failed to reset password', 'error');
+        }
+    });
+    
+    // Focus on first input
+    setTimeout(() => document.getElementById('resetNewPassword').focus(), 100);
 }
 
 // Toggle user active/inactive status

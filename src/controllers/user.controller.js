@@ -3,6 +3,7 @@
  * Handles user management operations
  */
 
+const bcrypt = require('bcryptjs');
 const { userModel, memberModel, auditModel } = require('../models');
 
 /**
@@ -285,6 +286,73 @@ const toggleUserStatus = async (req, res, next) => {
   }
 };
 
+/**
+ * Reset user password (Admin only)
+ * PUT /api/users/:id/reset-password
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+    
+    // Validate input
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+    
+    // Get user
+    const user = await userModel.findUserById(id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    
+    // Update password
+    const updatedUser = await userModel.updateUserPassword(id, passwordHash);
+    
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Log the action to audit
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    await auditModel.logAction(
+      req.user.id,
+      'PASSWORD_RESET',
+      'users',
+      id,
+      `Reset password for user: ${updatedUser.email} (${updatedUser.full_name})`,
+      ipAddress
+    );
+    
+    res.json({
+      success: true,
+      message: 'Password reset successfully',
+      data: {
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          full_name: updatedUser.full_name
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -292,6 +360,7 @@ module.exports = {
   deleteUser,
   assignMember,
   removeAssignment,
-  toggleUserStatus
+  toggleUserStatus,
+  resetPassword
 };
 

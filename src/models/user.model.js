@@ -97,10 +97,28 @@ const updateUser = async (id, updates) => {
 const updatePassword = async (id, newPassword) => {
   const password_hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
   
-  await query(
-    'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+  const result = await query(
+    `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP 
+     WHERE id = $2
+     RETURNING id, email, full_name, role, is_active, created_at, updated_at`,
     [password_hash, id]
   );
+  
+  return result.rows[0];
+};
+
+/**
+ * Update user password (admin reset - accepts pre-hashed password)
+ */
+const updateUserPassword = async (id, passwordHash) => {
+  const result = await query(
+    `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP 
+     WHERE id = $2
+     RETURNING id, email, full_name, role, is_active, created_at, updated_at`,
+    [passwordHash, id]
+  );
+  
+  return result.rows[0];
 };
 
 /**
@@ -161,6 +179,7 @@ module.exports = {
   getAllUsers,
   updateUser,
   updatePassword,
+  updateUserPassword,
   deleteUser,
   verifyPassword,
   getUserWithAssignments

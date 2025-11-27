@@ -29,5 +29,8 @@ router.delete('/:id/assignments/:assignmentId', adminOrManager, userController.r
 // Toggle user active status (admin or manager)
 router.put('/:id/status', adminOrManager, userController.toggleUserStatus);
 
+// Reset user password (admin only)
+router.put('/:id/reset-password', adminOnly, userController.resetPassword);
+
 module.exports = router;
 
