@@ -424,9 +424,11 @@ async function showDashboard() {
             ? ((totalVotes / registeredVoters) * 100).toFixed(1) 
             : 0;
         
-        // Get top 3 parties
+        // Get top 3 parties by vote count (dynamic sorting)
         const results = data.results || [];
-        const top3 = results.slice(0, 3);
+        const top3 = [...results]
+            .sort((a, b) => b.vote_count - a.vote_count) // Sort by votes DESC
+            .slice(0, 3);
         
         const content = document.getElementById('content');
         content.innerHTML = `
