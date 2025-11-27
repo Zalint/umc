@@ -9,6 +9,10 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
+// Detect production environment
+const isProduction = process.env.NODE_ENV === 'production' || 
+                     (process.env.DB_HOST && process.env.DB_HOST.includes('render.com'));
+
 // Create database connection
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -16,6 +20,7 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'gambia_election',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'password',
+  ssl: isProduction ? { rejectUnauthorized: false } : false
 });
 
 // Parse CSV
