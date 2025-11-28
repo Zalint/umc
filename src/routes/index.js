@@ -17,6 +17,7 @@ const projectionRoutes = require('./projection.routes');
 const sessionRoutes = require('./session.routes');
 const groupRoutes = require('./group.routes');
 const memberRoutes = require('./member.routes');
+const testDataRoutes = require('./testdata.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -30,6 +31,7 @@ router.use('/projections', projectionRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/groups', groupRoutes);
 router.use('/members', memberRoutes);
+router.use('/test-data', testDataRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

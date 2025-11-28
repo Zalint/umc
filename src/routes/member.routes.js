@@ -20,6 +20,9 @@ router.get('/', memberController.getAllMembers);
 // Get member statistics
 router.get('/stats', memberController.getMemberStats);
 
+// Search members
+router.get('/search', memberController.searchMembers);
+
 // Get member by ID
 router.get('/:id', memberController.getMemberById);
 

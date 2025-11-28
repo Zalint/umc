@@ -373,7 +373,9 @@ function buildMenu() {
     // If membership tab is active, show membership menu
     if (currentTab === 'membership') {
         const membershipMenuItems = [
-            { label: 'Member', view: 'member-register', icon: iconUser() }
+            { label: 'Member', view: 'member-register', icon: iconUser() },
+            { label: 'Statistics', view: 'member-statistics', icon: iconChart() },
+            { label: 'Search Members', view: 'member-search', icon: iconList() }
         ];
         
         navMenu.innerHTML = membershipMenuItems.map(item => `
@@ -413,7 +415,8 @@ function buildMenu() {
                 { label: 'Geography', view: 'geography', icon: iconMap() },
                 { label: 'Active Sessions', view: 'sessions', icon: iconUser() },
                 { label: 'Audit Logs', view: 'audit', icon: iconList() },
-                { label: 'System Settings', view: 'settings', icon: iconSettings() }
+                { label: 'System Settings', view: 'settings', icon: iconSettings() },
+                { label: 'Test Data', view: 'test-data', icon: iconSettings() }
             ];
             
             navMenu.innerHTML = configMenuItems.map(item => `
@@ -576,8 +579,17 @@ function loadCurrentView() {
         case 'projection-setup':
             showProjectionSetupView();
             break;
+        case 'test-data':
+            showTestDataView();
+            break;
         case 'member-register':
             showMemberRegistrationView();
+            break;
+        case 'member-statistics':
+            showMemberStatisticsView();
+            break;
+        case 'member-search':
+            showMemberSearchView();
             break;
         default:
             if (state.currentTab === 'membership') {
@@ -3372,23 +3384,63 @@ async function showMemberRegistrationView() {
                         </div>
                         
                         <div class="form-group">
-                            <label class="form-label">Age <span class="text-error">*</span></label>
-                            <input type="number" class="form-control" name="age" min="1" max="150" required>
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" 
+                                   placeholder="user@example.com"
+                                   autocomplete="email">
+                            <small class="form-text">Optional - Enter a valid email address</small>
                         </div>
                         
                         <div class="form-group">
-                            <label class="form-label">Sexe/Gender <span class="text-error">*</span></label>
-                            <select class="form-control form-select" name="sexe" required>
+                            <label class="form-label">Age</label>
+                            <input type="number" class="form-control" name="age" min="1" max="150">
+                            <small class="form-text">Optional</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Sexe/Gender</label>
+                            <select class="form-control form-select" name="sexe">
                                 <option value="">Select...</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
                                 <option value="Other">Other</option>
                             </select>
+                            <small class="form-text">Optional</small>
                         </div>
                         
                         <div class="form-group">
                             <label class="form-label">Occupation <span class="text-error">*</span></label>
-                            <input type="text" class="form-control" name="occupation" required>
+                            <select class="form-control form-select" name="occupation" id="occupationSelect" required>
+                                <option value="">Select Occupation...</option>
+                                <option value="Farmer">Farmer</option>
+                                <option value="Teacher">Teacher</option>
+                                <option value="Nurse">Nurse</option>
+                                <option value="Business Owner">Business Owner</option>
+                                <option value="Driver">Driver</option>
+                                <option value="Trader">Trader</option>
+                                <option value="Fisherman">Fisherman</option>
+                                <option value="Student">Student</option>
+                                <option value="Carpenter">Carpenter</option>
+                                <option value="Mason">Mason</option>
+                                <option value="Tailor">Tailor</option>
+                                <option value="Shopkeeper">Shopkeeper</option>
+                                <option value="Security Guard">Security Guard</option>
+                                <option value="Chef">Chef</option>
+                                <option value="Mechanic">Mechanic</option>
+                                <option value="Other">Other (Specify)</option>
+                            </select>
+                            <input type="text" class="form-control" name="occupation_other" id="occupationOther" 
+                                   placeholder="Please specify your occupation" 
+                                   style="display: none; margin-top: 0.5rem;"
+                                   required>
+                            <small class="form-text" id="occupationHelper">Select an occupation from the list</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Address</label>
+                            <textarea class="form-control" name="address" rows="3" 
+                                      placeholder="Street address, area, etc."></textarea>
+                            <small class="form-text">Optional - Enter member's address</small>
                         </div>
                         
                         <div class="form-group">
@@ -3450,19 +3502,52 @@ async function showMemberRegistrationView() {
                 filteredStations.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         });
         
+        // Handle occupation dropdown change
+        const occupationSelect = document.getElementById('occupationSelect');
+        const occupationOther = document.getElementById('occupationOther');
+        const occupationHelper = document.getElementById('occupationHelper');
+        
+        occupationSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'Other') {
+                occupationOther.style.display = 'block';
+                occupationOther.required = true;
+                occupationSelect.required = false;
+                occupationHelper.textContent = 'Please enter your occupation';
+            } else {
+                occupationOther.style.display = 'none';
+                occupationOther.required = false;
+                occupationSelect.required = true;
+                occupationOther.value = '';
+                occupationHelper.textContent = 'Select an occupation from the list';
+            }
+        });
+        
         // Handle form submission
         document.getElementById('memberRegistrationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             
+            // Determine occupation value
+            let occupation = formData.get('occupation');
+            if (occupation === 'Other') {
+                occupation = formData.get('occupation_other');
+                if (!occupation || occupation.trim() === '') {
+                    showToast('Please specify your occupation', 'error');
+                    return;
+                }
+            }
+            
             try {
+                const ageValue = formData.get('age');
                 await api.post('/members', {
                     first_name: formData.get('first_name'),
                     last_name: formData.get('last_name'),
                     phone: formData.get('phone'),
-                    age: parseInt(formData.get('age')),
-                    sexe: formData.get('sexe'),
-                    occupation: formData.get('occupation'),
+                    email: formData.get('email') || null,
+                    age: ageValue ? parseInt(ageValue) : null,
+                    sexe: formData.get('sexe') || null,
+                    occupation: occupation,
+                    address: formData.get('address') || null,
                     region_id: parseInt(formData.get('region_id')),
                     constituency_id: parseInt(formData.get('constituency_id')),
                     station_id: parseInt(formData.get('station_id')),
@@ -3473,6 +3558,10 @@ async function showMemberRegistrationView() {
                 e.target.reset();
                 constituencySelect.innerHTML = '<option value="">Select Constituency...</option>';
                 stationSelect.innerHTML = '<option value="">Select Station...</option>';
+                occupationOther.style.display = 'none';
+                occupationOther.required = false;
+                occupationSelect.required = true;
+                occupationHelper.textContent = 'Select an occupation from the list';
             } catch (error) {
                 showToast(error.message || 'Failed to register member', 'error');
             }
@@ -3481,6 +3570,959 @@ async function showMemberRegistrationView() {
     } catch (error) {
         showToast('Failed to load member registration form', 'error');
         console.error('Member Registration Error:', error);
+    }
+}
+
+// ============================================
+// Member Statistics View
+// ============================================
+async function showMemberStatisticsView() {
+    try {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+            <h2 class="mb-2">📊 Member Statistics</h2>
+            <p class="text-muted mb-2">Overview of registered members across the organization</p>
+            
+            <div id="statisticsContent">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <p class="text-muted">Loading statistics...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Load statistics
+        try {
+            const response = await api.get('/members/stats');
+            const stats = response.data.stats;
+            
+            // Calculate percentages
+            const total = stats.total;
+            const maleCount = stats.by_sexe.find(s => s.sexe === 'Male')?.count || 0;
+            const femaleCount = stats.by_sexe.find(s => s.sexe === 'Female')?.count || 0;
+            const malePercentage = total > 0 ? ((maleCount / total) * 100).toFixed(1) : 0;
+            const femalePercentage = total > 0 ? ((femaleCount / total) * 100).toFixed(1) : 0;
+            
+            // Calculate average age (we'll need to add this to the API)
+            const averageAge = stats.average_age || 0;
+            
+            content.innerHTML = `
+                <h2 class="mb-2">📊 Member Statistics</h2>
+                <p class="text-muted mb-2">Overview of registered members across the organization</p>
+                
+                <!-- Summary Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);">${total.toLocaleString()}</div>
+                            <div class="text-muted">Total Members</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">${maleCount.toLocaleString()}</div>
+                            <div class="text-muted">Male (${malePercentage}%)</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div style="font-size: 2rem; font-weight: bold; color: #ec4899;">${femaleCount.toLocaleString()}</div>
+                            <div class="text-muted">Female (${femalePercentage}%)</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);">${averageAge.toFixed(1)}</div>
+                            <div class="text-muted">Average Age</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Geographic Distribution -->
+                <div class="card mb-2">
+                    <div class="card-header">
+                        <h3 class="card-title">📍 Geographic Distribution</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Region</th>
+                                        <th>Total</th>
+                                        <th>Male</th>
+                                        <th>Female</th>
+                                        <th>% Male</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${stats.by_region.map(region => {
+                                        const regionTotal = region.count;
+                                        const regionMale = region.male_count || 0;
+                                        const regionFemale = region.female_count || 0;
+                                        const regionMalePct = regionTotal > 0 ? ((regionMale / regionTotal) * 100).toFixed(1) : 0;
+                                        return `
+                                            <tr>
+                                                <td><strong>${region.region_name || 'Unknown'}</strong></td>
+                                                <td>${regionTotal}</td>
+                                                <td>${regionMale}</td>
+                                                <td>${regionFemale}</td>
+                                                <td>${regionMalePct}%</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gender Distribution -->
+                <div class="card mb-2">
+                    <div class="card-header">
+                        <h3 class="card-title">👥 Gender Distribution</h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: flex; align-items: center; gap: 2rem; margin-bottom: 1rem;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                    <span>Male: ${malePercentage}%</span>
+                                    <span>${maleCount}</span>
+                                </div>
+                                <div style="background: #e5e7eb; height: 24px; border-radius: 4px; overflow: hidden;">
+                                    <div style="background: #3b82f6; height: 100%; width: ${malePercentage}%;"></div>
+                                </div>
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                    <span>Female: ${femalePercentage}%</span>
+                                    <span>${femaleCount}</span>
+                                </div>
+                                <div style="background: #e5e7eb; height: 24px; border-radius: 4px; overflow: hidden;">
+                                    <div style="background: #ec4899; height: 100%; width: ${femalePercentage}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Age Groups -->
+                <div class="card mb-2">
+                    <div class="card-header">
+                        <h3 class="card-title">🎂 Age Group Distribution</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Age Group</th>
+                                        <th>Count</th>
+                                        <th>Percentage</th>
+                                        <th>Visual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${stats.by_age && stats.by_age.length > 0 ? stats.by_age.map(age => {
+                                        const pct = total > 0 ? ((age.count / total) * 100).toFixed(1) : 0;
+                                        return `
+                                            <tr>
+                                                <td><strong>${age.age_group}</strong></td>
+                                                <td>${age.count}</td>
+                                                <td>${pct}%</td>
+                                                <td>
+                                                    <div style="background: #e5e7eb; height: 20px; border-radius: 4px; overflow: hidden; width: 200px;">
+                                                        <div style="background: var(--primary-color); height: 100%; width: ${pct}%;"></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('') : '<tr><td colspan="4" class="text-center text-muted">No age data available</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                ${stats.by_occupation && stats.by_occupation.length > 0 ? `
+                <!-- Occupation Distribution -->
+                <div class="card mb-2">
+                    <div class="card-header">
+                        <h3 class="card-title">💼 Top Occupations</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Occupation</th>
+                                        <th>Count</th>
+                                        <th>Percentage</th>
+                                        <th>Visual</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${stats.by_occupation.map(occ => {
+                                        const pct = total > 0 ? ((occ.count / total) * 100).toFixed(1) : 0;
+                                        return `
+                                            <tr>
+                                                <td><strong>${occ.occupation}</strong></td>
+                                                <td>${occ.count}</td>
+                                                <td>${pct}%</td>
+                                                <td>
+                                                    <div style="background: #e5e7eb; height: 20px; border-radius: 4px; overflow: hidden; width: 200px;">
+                                                        <div style="background: var(--primary-color); height: 100%; width: ${pct}%;"></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+        } catch (error) {
+            content.innerHTML = `
+                <h2 class="mb-2">📊 Member Statistics</h2>
+                <div class="card">
+                    <div class="card-body text-center">
+                        <p class="text-error">Failed to load statistics: ${error.message || 'Unknown error'}</p>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        showToast('Failed to load statistics view', 'error');
+        console.error('Member Statistics Error:', error);
+    }
+}
+
+// ============================================
+// Member Search View
+// ============================================
+async function showMemberSearchView() {
+    try {
+        // Load geography data if not already loaded
+        await loadGeographyData();
+        
+        const content = document.getElementById('content');
+        content.innerHTML = `
+            <h2 class="mb-2">🔍 Search Members</h2>
+            <p class="text-muted mb-2">Find and filter members by various criteria</p>
+            
+            <!-- Search & Filter Panel -->
+            <div class="card mb-2">
+                <div class="card-header">
+                    <h3 class="card-title">Search & Filter</h3>
+                </div>
+                <div class="card-body">
+                    <form id="memberSearchForm">
+                        <div class="form-group">
+                            <label class="form-label">Quick Search</label>
+                            <input type="text" class="form-control" id="quickSearch" 
+                                   placeholder="Search by name, phone, or occupation...">
+                            <small class="form-text">Search across name, phone number, and occupation</small>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                            <div class="form-group">
+                                <label class="form-label">First Name</label>
+                                <input type="text" class="form-control" name="first_name" placeholder="First name">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Last Name</label>
+                                <input type="text" class="form-control" name="last_name" placeholder="Last name">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" class="form-control" name="phone" placeholder="Phone number">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" name="email" placeholder="Email address">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Age (Min)</label>
+                                <input type="number" class="form-control" name="age_min" min="1" max="150" placeholder="Min age">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Age (Max)</label>
+                                <input type="number" class="form-control" name="age_max" min="1" max="150" placeholder="Max age">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Gender</label>
+                                <select class="form-control form-select" name="sexe">
+                                    <option value="">All</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Region</label>
+                                <select class="form-control form-select" name="region_id" id="searchRegionSelect">
+                                    <option value="">All Regions</option>
+                                    ${state.regions.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Constituency</label>
+                                <select class="form-control form-select" name="constituency_id" id="searchConstituencySelect">
+                                    <option value="">All Constituencies</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Station</label>
+                                <select class="form-control form-select" name="station_id" id="searchStationSelect">
+                                    <option value="">All Stations</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Occupation</label>
+                                <input type="text" class="form-control" name="occupation" placeholder="Occupation">
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                            <button type="submit" class="btn btn-primary">Search</button>
+                            <button type="button" class="btn btn-outline" id="clearSearchBtn">Clear Filters</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Results -->
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 class="card-title">Results</h3>
+                    <div>
+                        <select class="form-control form-select" id="sortBy" style="display: inline-block; width: auto; margin-right: 0.5rem;">
+                            <option value="name">Sort by Name</option>
+                            <option value="age">Sort by Age</option>
+                            <option value="created_at">Sort by Date</option>
+                        </select>
+                        <button class="btn btn-outline btn-sm" id="exportBtn">Export CSV</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="searchResults">
+                        <p class="text-muted text-center">Enter search criteria and click "Search" to find members</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Set up cascading dropdowns for search
+        const searchRegionSelect = document.getElementById('searchRegionSelect');
+        const searchConstituencySelect = document.getElementById('searchConstituencySelect');
+        const searchStationSelect = document.getElementById('searchStationSelect');
+        
+        searchRegionSelect.addEventListener('change', (e) => {
+            const regionId = parseInt(e.target.value);
+            const filteredConstituencies = state.constituencies.filter(c => !regionId || c.region_id === regionId);
+            
+            searchConstituencySelect.innerHTML = '<option value="">All Constituencies</option>' +
+                filteredConstituencies.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            
+            searchStationSelect.innerHTML = '<option value="">All Stations</option>';
+        });
+        
+        searchConstituencySelect.addEventListener('change', (e) => {
+            const constituencyId = parseInt(e.target.value);
+            const filteredStations = state.stations.filter(s => !constituencyId || s.constituency_id === constituencyId);
+            
+            searchStationSelect.innerHTML = '<option value="">All Stations</option>' +
+                filteredStations.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        });
+        
+        // Handle search form submission
+        let currentPage = 1;
+        const pageSize = 25;
+        
+        const performSearch = async (page = 1) => {
+            try {
+                const formData = new FormData(document.getElementById('memberSearchForm'));
+                const quickSearch = document.getElementById('quickSearch').value;
+                
+                // Build query parameters
+                const params = new URLSearchParams();
+                if (quickSearch) params.append('q', quickSearch);
+                if (formData.get('first_name')) params.append('first_name', formData.get('first_name'));
+                if (formData.get('last_name')) params.append('last_name', formData.get('last_name'));
+                if (formData.get('phone')) params.append('phone', formData.get('phone'));
+                if (formData.get('email')) params.append('email', formData.get('email'));
+                if (formData.get('age_min')) params.append('age_min', formData.get('age_min'));
+                if (formData.get('age_max')) params.append('age_max', formData.get('age_max'));
+                if (formData.get('sexe')) params.append('sexe', formData.get('sexe'));
+                if (formData.get('region_id')) params.append('region_id', formData.get('region_id'));
+                if (formData.get('constituency_id')) params.append('constituency_id', formData.get('constituency_id'));
+                if (formData.get('station_id')) params.append('station_id', formData.get('station_id'));
+                if (formData.get('occupation')) params.append('occupation', formData.get('occupation'));
+                
+                params.append('page', page);
+                params.append('limit', pageSize);
+                params.append('sort_by', document.getElementById('sortBy').value);
+                
+                const response = await api.get(`/members/search?${params.toString()}`);
+                const data = response.data;
+                
+                const resultsDiv = document.getElementById('searchResults');
+                if (data.members.length === 0) {
+                    resultsDiv.innerHTML = '<p class="text-muted text-center">No members found matching your criteria</p>';
+                    return;
+                }
+                
+                const totalPages = Math.ceil(data.pagination.total / pageSize);
+                currentPage = page;
+                
+                resultsDiv.innerHTML = `
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th>Age</th>
+                                    <th>Gender</th>
+                                    <th>Address</th>
+                                    <th>Station</th>
+                                    <th>Constituency</th>
+                                    <th>Region</th>
+                                    <th>Occupation</th>
+                                    ${(state.user.role === 'admin' || state.user.role === 'manager') ? '<th>Actions</th>' : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.members.map((member, index) => `
+                                    <tr>
+                                        <td>${(page - 1) * pageSize + index + 1}</td>
+                                        <td><strong>${member.first_name} ${member.last_name}</strong></td>
+                                        <td>${member.phone || '-'}</td>
+                                        <td>${member.email || '-'}</td>
+                                        <td>${member.age || '-'}</td>
+                                        <td>${member.sexe || '-'}</td>
+                                        <td>${member.address || '-'}</td>
+                                        <td>${member.station_name || '-'}</td>
+                                        <td>${member.constituency_name || '-'}</td>
+                                        <td>${member.region_name || '-'}</td>
+                                        <td>${member.occupation || '-'}</td>
+                                        ${(state.user.role === 'admin' || state.user.role === 'manager') ? `
+                                        <td>
+                                            <button class="btn btn-sm btn-primary" onclick="showEditMemberModal(${member.id})" style="margin-right: 0.25rem;">
+                                                Edit
+                                            </button>
+                                            ${state.user.role === 'admin' ? `
+                                            <button class="btn btn-sm btn-danger" onclick="deleteMember(${member.id}, '${(member.first_name + ' ' + member.last_name).replace(/'/g, "\\'")}')">
+                                                Delete
+                                            </button>
+                                            ` : ''}
+                                        </td>
+                                        ` : ''}
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+                        <div>
+                            Showing ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, data.pagination.total)} of ${data.pagination.total} results
+                        </div>
+                        <div>
+                            ${page > 1 ? `<button class="btn btn-outline btn-sm" onclick="performSearch(${page - 1})">Previous</button>` : ''}
+                            <span style="margin: 0 1rem;">Page ${page} of ${totalPages}</span>
+                            ${page < totalPages ? `<button class="btn btn-outline btn-sm" onclick="performSearch(${page + 1})">Next</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('searchResults').innerHTML = `
+                    <p class="text-error">Failed to search members: ${error.message || 'Unknown error'}</p>
+                `;
+            }
+        };
+        
+        // Make performSearch available globally for pagination buttons
+        window.performSearch = performSearch;
+        
+        document.getElementById('memberSearchForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            performSearch(1);
+        });
+        
+        document.getElementById('clearSearchBtn').addEventListener('click', () => {
+            document.getElementById('memberSearchForm').reset();
+            document.getElementById('quickSearch').value = '';
+            searchConstituencySelect.innerHTML = '<option value="">All Constituencies</option>';
+            searchStationSelect.innerHTML = '<option value="">All Stations</option>';
+            document.getElementById('searchResults').innerHTML = '<p class="text-muted text-center">Enter search criteria and click "Search" to find members</p>';
+        });
+        
+    } catch (error) {
+        showToast('Failed to load search view', 'error');
+        console.error('Member Search Error:', error);
+    }
+}
+
+// ============================================
+// Edit Member Modal
+// ============================================
+async function showEditMemberModal(memberId) {
+    try {
+        // Load member data
+        const response = await api.get(`/members/${memberId}`);
+        const member = response.data.member;
+        
+        // Load geography data if not already loaded
+        await loadGeographyData();
+        
+        // Create modal element
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop';
+        modal.id = 'editMemberModal';
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h3 class="modal-title">Edit Member</h3>
+                    <button class="modal-close" onclick="closeEditMemberModal()">&times;</button>
+                </div>
+                    <div class="modal-body">
+                        <form id="editMemberForm">
+                            <div class="form-group">
+                                <label class="form-label">First Name <span class="text-error">*</span></label>
+                                <input type="text" class="form-control" name="first_name" value="${member.first_name || ''}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Last Name <span class="text-error">*</span></label>
+                                <input type="text" class="form-control" name="last_name" value="${member.last_name || ''}" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Phone <span class="text-error">*</span></label>
+                                <input type="tel" class="form-control" name="phone" value="${member.phone || ''}" required>
+                                <small class="form-text">Gambia format: +220 followed by 7 digits</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" name="email" value="${member.email || ''}" autocomplete="email">
+                                <small class="form-text">Optional</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Age</label>
+                                <input type="number" class="form-control" name="age" min="1" max="150" value="${member.age || ''}">
+                                <small class="form-text">Optional</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Sexe/Gender</label>
+                                <select class="form-control form-select" name="sexe" id="editSexeSelect">
+                                    <option value="">Select...</option>
+                                    <option value="Male" ${member.sexe === 'Male' ? 'selected' : ''}>Male</option>
+                                    <option value="Female" ${member.sexe === 'Female' ? 'selected' : ''}>Female</option>
+                                    <option value="Other" ${member.sexe === 'Other' ? 'selected' : ''}>Other</option>
+                                </select>
+                                <small class="form-text">Optional</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Occupation <span class="text-error">*</span></label>
+                                <select class="form-control form-select" name="occupation" id="editOccupationSelect" required>
+                                    <option value="">Select Occupation...</option>
+                                    <option value="Farmer" ${member.occupation === 'Farmer' ? 'selected' : ''}>Farmer</option>
+                                    <option value="Teacher" ${member.occupation === 'Teacher' ? 'selected' : ''}>Teacher</option>
+                                    <option value="Nurse" ${member.occupation === 'Nurse' ? 'selected' : ''}>Nurse</option>
+                                    <option value="Business Owner" ${member.occupation === 'Business Owner' ? 'selected' : ''}>Business Owner</option>
+                                    <option value="Driver" ${member.occupation === 'Driver' ? 'selected' : ''}>Driver</option>
+                                    <option value="Trader" ${member.occupation === 'Trader' ? 'selected' : ''}>Trader</option>
+                                    <option value="Fisherman" ${member.occupation === 'Fisherman' ? 'selected' : ''}>Fisherman</option>
+                                    <option value="Student" ${member.occupation === 'Student' ? 'selected' : ''}>Student</option>
+                                    <option value="Carpenter" ${member.occupation === 'Carpenter' ? 'selected' : ''}>Carpenter</option>
+                                    <option value="Mason" ${member.occupation === 'Mason' ? 'selected' : ''}>Mason</option>
+                                    <option value="Tailor" ${member.occupation === 'Tailor' ? 'selected' : ''}>Tailor</option>
+                                    <option value="Shopkeeper" ${member.occupation === 'Shopkeeper' ? 'selected' : ''}>Shopkeeper</option>
+                                    <option value="Security Guard" ${member.occupation === 'Security Guard' ? 'selected' : ''}>Security Guard</option>
+                                    <option value="Chef" ${member.occupation === 'Chef' ? 'selected' : ''}>Chef</option>
+                                    <option value="Mechanic" ${member.occupation === 'Mechanic' ? 'selected' : ''}>Mechanic</option>
+                                    <option value="Other" ${!['Farmer', 'Teacher', 'Nurse', 'Business Owner', 'Driver', 'Trader', 'Fisherman', 'Student', 'Carpenter', 'Mason', 'Tailor', 'Shopkeeper', 'Security Guard', 'Chef', 'Mechanic'].includes(member.occupation) ? 'selected' : ''}>Other (Specify)</option>
+                                </select>
+                                <input type="text" class="form-control" name="occupation_other" id="editOccupationOther" 
+                                       placeholder="Please specify your occupation" 
+                                       style="display: ${!['Farmer', 'Teacher', 'Nurse', 'Business Owner', 'Driver', 'Trader', 'Fisherman', 'Student', 'Carpenter', 'Mason', 'Tailor', 'Shopkeeper', 'Security Guard', 'Chef', 'Mechanic'].includes(member.occupation) ? 'block' : 'none'}; margin-top: 0.5rem;"
+                                       value="${!['Farmer', 'Teacher', 'Nurse', 'Business Owner', 'Driver', 'Trader', 'Fisherman', 'Student', 'Carpenter', 'Mason', 'Tailor', 'Shopkeeper', 'Security Guard', 'Chef', 'Mechanic'].includes(member.occupation) ? (member.occupation || '') : ''}">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Address</label>
+                                <textarea class="form-control" name="address" rows="3" placeholder="Street address, area, etc.">${member.address || ''}</textarea>
+                                <small class="form-text">Optional</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Region <span class="text-error">*</span></label>
+                                <select class="form-control form-select" name="region_id" id="editRegionSelect" required>
+                                    <option value="">Select Region...</option>
+                                    ${state.regions.map(r => `
+                                        <option value="${r.id}" ${member.region_id === r.id ? 'selected' : ''}>${r.name}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Constituency <span class="text-error">*</span></label>
+                                <select class="form-control form-select" name="constituency_id" id="editConstituencySelect" required>
+                                    <option value="">Select Constituency...</option>
+                                    ${state.constituencies.filter(c => c.region_id === member.region_id).map(c => `
+                                        <option value="${c.id}" ${member.constituency_id === c.id ? 'selected' : ''}>${c.name}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Station <span class="text-error">*</span></label>
+                                <select class="form-control form-select" name="station_id" id="editStationSelect" required>
+                                    <option value="">Select Station...</option>
+                                    ${state.stations.filter(s => s.constituency_id === member.constituency_id).map(s => `
+                                        <option value="${s.id}" ${member.station_id === s.id ? 'selected' : ''}>${s.name}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Comment</label>
+                                <textarea class="form-control" name="comment" rows="4" placeholder="General information or notes...">${member.comment || ''}</textarea>
+                            </div>
+                            
+                            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
+                                <button type="button" class="btn btn-outline" onclick="closeEditMemberModal()">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Update Member</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add modal to body
+        document.body.appendChild(modal);
+        
+        // Set up cascading dropdowns
+        const editRegionSelect = document.getElementById('editRegionSelect');
+        const editConstituencySelect = document.getElementById('editConstituencySelect');
+        const editStationSelect = document.getElementById('editStationSelect');
+        const editOccupationSelect = document.getElementById('editOccupationSelect');
+        const editOccupationOther = document.getElementById('editOccupationOther');
+        
+        editRegionSelect.addEventListener('change', (e) => {
+            const regionId = parseInt(e.target.value);
+            const filteredConstituencies = state.constituencies.filter(c => c.region_id === regionId);
+            
+            editConstituencySelect.innerHTML = '<option value="">Select Constituency...</option>' +
+                filteredConstituencies.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            
+            editStationSelect.innerHTML = '<option value="">Select Station...</option>';
+        });
+        
+        editConstituencySelect.addEventListener('change', (e) => {
+            const constituencyId = parseInt(e.target.value);
+            const filteredStations = state.stations.filter(s => s.constituency_id === constituencyId);
+            
+            editStationSelect.innerHTML = '<option value="">Select Station...</option>' +
+                filteredStations.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        });
+        
+        editOccupationSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'Other') {
+                editOccupationOther.style.display = 'block';
+                editOccupationOther.required = true;
+                editOccupationSelect.required = false;
+            } else {
+                editOccupationOther.style.display = 'none';
+                editOccupationOther.required = false;
+                editOccupationSelect.required = true;
+                editOccupationOther.value = '';
+            }
+        });
+        
+        // Handle form submission
+        document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            // Determine occupation value
+            let occupation = formData.get('occupation');
+            if (occupation === 'Other') {
+                occupation = formData.get('occupation_other');
+                if (!occupation || occupation.trim() === '') {
+                    showToast('Please specify your occupation', 'error');
+                    return;
+                }
+            }
+            
+            try {
+                const ageValue = formData.get('age');
+                await api.put(`/members/${memberId}`, {
+                    first_name: formData.get('first_name'),
+                    last_name: formData.get('last_name'),
+                    phone: formData.get('phone'),
+                    email: formData.get('email') || null,
+                    age: ageValue ? parseInt(ageValue) : null,
+                    sexe: formData.get('sexe') || null,
+                    occupation: occupation,
+                    address: formData.get('address') || null,
+                    region_id: parseInt(formData.get('region_id')),
+                    constituency_id: parseInt(formData.get('constituency_id')),
+                    station_id: parseInt(formData.get('station_id')),
+                    comment: formData.get('comment') || null
+                });
+                
+                showToast('Member updated successfully!', 'success');
+                closeEditMemberModal();
+                
+                // Refresh search results if we're on the search page
+                if (window.performSearch) {
+                    window.performSearch(currentPage || 1);
+                }
+            } catch (error) {
+                showToast(error.response?.data?.message || error.message || 'Failed to update member', 'error');
+            }
+        });
+        
+    } catch (error) {
+        showToast('Failed to load member data', 'error');
+        console.error('Edit Member Error:', error);
+    }
+}
+
+function closeEditMemberModal() {
+    const modal = document.getElementById('editMemberModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// ============================================
+// Delete Member Function
+// ============================================
+async function deleteMember(memberId, memberName) {
+    if (!confirm(`Are you sure you want to delete member "${memberName}"?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        await api.delete(`/members/${memberId}`);
+        showToast(`Member "${memberName}" deleted successfully`, 'success');
+        
+        // Refresh search results if we're on the search page
+        if (window.performSearch) {
+            window.performSearch(currentPage || 1);
+        }
+    } catch (error) {
+        showToast(error.response?.data?.message || error.message || 'Failed to delete member', 'error');
+    }
+}
+
+// ============================================
+// Test Data View (Admin only)
+// ============================================
+async function showTestDataView() {
+    try {
+        const content = document.getElementById('content');
+        content.innerHTML = `
+            <h2 class="mb-2">Test Data Management</h2>
+            <p class="text-muted mb-2">Generate and manage test data for development and testing purposes.</p>
+            
+            <!-- Election Results Test Data -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Election Results Test Data</h3>
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom: 1rem;">Generate test election results for testing the system.</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div>
+                            <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">Fill All Stations</h4>
+                            <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">
+                                Fill test data for all stations with realistic vote distribution.
+                            </p>
+                            <button class="btn btn-primary" id="fillAllStationsBtn">
+                                Fill Test Data (All Stations)
+                            </button>
+                        </div>
+                        
+                        <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                            <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">Fill Projection Subset</h4>
+                            <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">
+                                <strong>Warning:</strong> This will clear all existing test data first, then fill only projection stations (74-75 stations).
+                            </p>
+                            <button class="btn btn-info" id="fillSubsetStationsBtn">
+                                Fill Test Data (Projection Subset)
+                            </button>
+                        </div>
+                        
+                        <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                            <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">Clear All Election Data</h4>
+                            <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">
+                                Remove all test election results from all stations.
+                            </p>
+                            <button class="btn btn-danger" id="clearAllStationsBtn">
+                                Clear All Test Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Member Test Data -->
+            <div class="card mt-2">
+                <div class="card-header">
+                    <h3 class="card-title">Member Test Data</h3>
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom: 1rem;">Generate test member data using common Gambia names.</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div>
+                            <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">Fill Test Members</h4>
+                            <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">
+                                Create test members with realistic Gambia names, distributed across stations.
+                            </p>
+                            <button class="btn btn-primary" id="fillTestMembersBtn">
+                                Fill Test Member Data
+                            </button>
+                        </div>
+                        
+                        <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                            <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">Clear All Member Data</h4>
+                            <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">
+                                Remove all test member records.
+                            </p>
+                            <button class="btn btn-danger" id="clearTestMembersBtn">
+                                Clear All Test Members
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Fill all stations
+        document.getElementById('fillAllStationsBtn').addEventListener('click', async () => {
+            if (!confirm('Fill test data for ALL stations? This will overwrite existing results.')) {
+                return;
+            }
+            
+            try {
+                showLoader();
+                const response = await api.post('/test-data/fill-all');
+                hideLoader();
+                const stationsCount = response?.data?.stations_filled || 'unknown';
+                const message = response?.message || 'Test data filled successfully';
+                showToast(`Success: ${message} (${stationsCount} stations)`, 'success');
+            } catch (error) {
+                hideLoader();
+                showToast(error.response?.data?.message || error.message || 'Failed to fill test data', 'error');
+            }
+        });
+        
+        // Fill subset (projection stations) - clears all first
+        document.getElementById('fillSubsetStationsBtn').addEventListener('click', async () => {
+            if (!confirm('WARNING: This will CLEAR all existing test data first, then fill only projection stations.\n\nContinue?')) {
+                return;
+            }
+            
+            try {
+                showLoader();
+                const response = await api.post('/test-data/fill-subset');
+                hideLoader();
+                const stationsCount = response?.data?.stations_filled || 'unknown';
+                const message = response?.message || 'Test data filled successfully';
+                showToast(`Success: ${message} (${stationsCount} stations)`, 'success');
+            } catch (error) {
+                hideLoader();
+                showToast(error.response?.data?.message || error.message || 'Failed to fill subset test data', 'error');
+            }
+        });
+        
+        // Clear all stations
+        document.getElementById('clearAllStationsBtn').addEventListener('click', async () => {
+            if (!confirm('Clear ALL test election data from all stations?')) {
+                return;
+            }
+            
+            try {
+                showLoader();
+                const response = await api.post('/test-data/clear-all');
+                hideLoader();
+                const message = response?.message || 'Test data cleared successfully';
+                showToast(`Success: ${message}`, 'success');
+            } catch (error) {
+                hideLoader();
+                showToast(error.response?.data?.message || error.message || 'Failed to clear test data', 'error');
+            }
+        });
+        
+        // Fill test members
+        document.getElementById('fillTestMembersBtn').addEventListener('click', async () => {
+            if (!confirm('Create test members with Gambia names?')) {
+                return;
+            }
+            
+            try {
+                showLoader();
+                const response = await api.post('/test-data/fill-members');
+                hideLoader();
+                const membersCount = response?.data?.members_created || 'unknown';
+                const message = response?.message || 'Test members created successfully';
+                showToast(`Success: ${message} (${membersCount} members)`, 'success');
+            } catch (error) {
+                hideLoader();
+                showToast(error.response?.data?.message || error.message || 'Failed to fill test members', 'error');
+            }
+        });
+        
+        // Clear test members
+        document.getElementById('clearTestMembersBtn').addEventListener('click', async () => {
+            if (!confirm('Clear ALL test member data?')) {
+                return;
+            }
+            
+            try {
+                showLoader();
+                const response = await api.post('/test-data/clear-members');
+                hideLoader();
+                const membersCount = response?.data?.members_deleted || 'unknown';
+                const message = response?.message || 'Test members cleared successfully';
+                showToast(`Success: ${message} (${membersCount} members deleted)`, 'success');
+            } catch (error) {
+                hideLoader();
+                showToast(error.response?.data?.message || error.message || 'Failed to clear test members', 'error');
+            }
+        });
+        
+    } catch (error) {
+        hideLoader();
+        showToast('Failed to load test data management', 'error');
+        console.error('Test Data View Error:', error);
     }
 }
 

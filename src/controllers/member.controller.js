@@ -5,6 +5,7 @@
 
 const { memberModel, auditModel, groupModel } = require('../models');
 const { validateGambiaPhone, normalizePhone } = require('../utils/phoneValidator');
+const { validateEmail } = require('../utils/emailValidator');
 
 /**
  * Create a new member
@@ -12,9 +13,9 @@ const { validateGambiaPhone, normalizePhone } = require('../utils/phoneValidator
  */
 const createMember = async (req, res, next) => {
   try {
-    // Check if user has Membership group access
+    // Check if user has Membership group access or is admin/manager
     const hasAccess = await groupModel.userHasGroup(req.user.id, 'Membership');
-    if (!hasAccess && req.user.role !== 'admin') {
+    if (!hasAccess && req.user.role !== 'admin' && req.user.role !== 'manager') {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to the Membership group'
@@ -25,9 +26,11 @@ const createMember = async (req, res, next) => {
       first_name,
       last_name,
       phone,
+      email,
       age,
       sexe,
       occupation,
+      address,
       station_id,
       constituency_id,
       region_id,
@@ -35,10 +38,10 @@ const createMember = async (req, res, next) => {
     } = req.body;
     
     // Validate required fields
-    if (!first_name || !last_name || !phone || !age || !sexe || !occupation) {
+    if (!first_name || !last_name || !phone || !occupation) {
       return res.status(400).json({
         success: false,
-        message: 'First name, last name, phone, age, sexe, and occupation are required'
+        message: 'First name, last name, phone, and occupation are required'
       });
     }
     
@@ -51,32 +54,52 @@ const createMember = async (req, res, next) => {
       });
     }
     
-    // Validate age
-    const ageNum = parseInt(age);
-    if (isNaN(ageNum) || ageNum < 1 || ageNum > 150) {
-      return res.status(400).json({
-        success: false,
-        message: 'Age must be a valid number between 1 and 150'
-      });
+    // Validate email (optional field)
+    let normalizedEmail = null;
+    if (email && email.trim() !== '') {
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: emailValidation.error
+        });
+      }
+      normalizedEmail = emailValidation.normalized;
     }
     
-    // Validate sexe
-    const validSexe = ['Male', 'Female', 'Other'];
-    if (!validSexe.includes(sexe)) {
-      return res.status(400).json({
-        success: false,
-        message: `Sexe must be one of: ${validSexe.join(', ')}`
-      });
+    // Validate age (optional)
+    let ageNum = null;
+    if (age !== undefined && age !== null && age !== '') {
+      ageNum = parseInt(age);
+      if (isNaN(ageNum) || ageNum < 1 || ageNum > 150) {
+        return res.status(400).json({
+          success: false,
+          message: 'Age must be a valid number between 1 and 150'
+        });
+      }
     }
     
-    // Create member with normalized phone
+    // Validate sexe (optional)
+    if (sexe && sexe !== '') {
+      const validSexe = ['Male', 'Female', 'Other'];
+      if (!validSexe.includes(sexe)) {
+        return res.status(400).json({
+          success: false,
+          message: `Sexe must be one of: ${validSexe.join(', ')}`
+        });
+      }
+    }
+    
+    // Create member with normalized phone and email
     const member = await memberModel.createMember({
       first_name,
       last_name,
       phone: phoneValidation.normalized,
+      email: normalizedEmail,
       age: ageNum,
-      sexe,
+      sexe: sexe || null,
       occupation,
+      address: address || null,
       station_id: station_id || null,
       constituency_id: constituency_id || null,
       region_id: region_id || null,
@@ -111,9 +134,9 @@ const createMember = async (req, res, next) => {
  */
 const getAllMembers = async (req, res, next) => {
   try {
-    // Check if user has Membership group access
+    // Check if user has Membership group access or is admin/manager
     const hasAccess = await groupModel.userHasGroup(req.user.id, 'Membership');
-    if (!hasAccess && req.user.role !== 'admin') {
+    if (!hasAccess && req.user.role !== 'admin' && req.user.role !== 'manager') {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to the Membership group'
@@ -145,9 +168,9 @@ const getAllMembers = async (req, res, next) => {
  */
 const getMemberById = async (req, res, next) => {
   try {
-    // Check if user has Membership group access
+    // Check if user has Membership group access or is admin/manager
     const hasAccess = await groupModel.userHasGroup(req.user.id, 'Membership');
-    if (!hasAccess && req.user.role !== 'admin') {
+    if (!hasAccess && req.user.role !== 'admin' && req.user.role !== 'manager') {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to the Membership group'
@@ -179,9 +202,9 @@ const getMemberById = async (req, res, next) => {
  */
 const updateMember = async (req, res, next) => {
   try {
-    // Check if user has Membership group access
+    // Check if user has Membership group access or is admin/manager
     const hasAccess = await groupModel.userHasGroup(req.user.id, 'Membership');
-    if (!hasAccess && req.user.role !== 'admin') {
+    if (!hasAccess && req.user.role !== 'admin' && req.user.role !== 'manager') {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to the Membership group'
@@ -203,8 +226,24 @@ const updateMember = async (req, res, next) => {
       updates.phone = phoneValidation.normalized;
     }
     
-    // Validate age if provided
-    if (updates.age !== undefined) {
+    // Validate email if provided
+    if (updates.email !== undefined) {
+      if (updates.email && updates.email.trim() !== '') {
+        const emailValidation = validateEmail(updates.email);
+        if (!emailValidation.valid) {
+          return res.status(400).json({
+            success: false,
+            message: emailValidation.error
+          });
+        }
+        updates.email = emailValidation.normalized;
+      } else {
+        updates.email = null;
+      }
+    }
+    
+    // Validate age if provided (optional)
+    if (updates.age !== undefined && updates.age !== null && updates.age !== '') {
       const ageNum = parseInt(updates.age);
       if (isNaN(ageNum) || ageNum < 1 || ageNum > 150) {
         return res.status(400).json({
@@ -213,10 +252,12 @@ const updateMember = async (req, res, next) => {
         });
       }
       updates.age = ageNum;
+    } else if (updates.age === '' || updates.age === null) {
+      updates.age = null;
     }
     
-    // Validate sexe if provided
-    if (updates.sexe) {
+    // Validate sexe if provided (optional)
+    if (updates.sexe && updates.sexe !== '') {
       const validSexe = ['Male', 'Female', 'Other'];
       if (!validSexe.includes(updates.sexe)) {
         return res.status(400).json({
@@ -224,6 +265,8 @@ const updateMember = async (req, res, next) => {
           message: `Sexe must be one of: ${validSexe.join(', ')}`
         });
       }
+    } else if (updates.sexe === '' || updates.sexe === null) {
+      updates.sexe = null;
     }
     
     const member = await memberModel.updateMember(id, updates);
@@ -262,9 +305,9 @@ const updateMember = async (req, res, next) => {
  */
 const deleteMember = async (req, res, next) => {
   try {
-    // Check if user has Membership group access
+    // Check if user has Membership group access or is admin/manager
     const hasAccess = await groupModel.userHasGroup(req.user.id, 'Membership');
-    if (!hasAccess && req.user.role !== 'admin') {
+    if (!hasAccess && req.user.role !== 'admin' && req.user.role !== 'manager') {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to the Membership group'
@@ -307,9 +350,9 @@ const deleteMember = async (req, res, next) => {
  */
 const getMemberStats = async (req, res, next) => {
   try {
-    // Check if user has Membership group access
+    // Check if user has Membership group access or is admin/manager
     const hasAccess = await groupModel.userHasGroup(req.user.id, 'Membership');
-    if (!hasAccess && req.user.role !== 'admin') {
+    if (!hasAccess && req.user.role !== 'admin' && req.user.role !== 'manager') {
       return res.status(403).json({
         success: false,
         message: 'You do not have access to the Membership group'
@@ -327,12 +370,75 @@ const getMemberStats = async (req, res, next) => {
   }
 };
 
+/**
+ * Search members
+ * GET /api/members/search
+ */
+const searchMembers = async (req, res, next) => {
+  try {
+    // Check if user has Membership group access or is admin/manager
+    const hasAccess = await groupModel.userHasGroup(req.user.id, 'Membership');
+    if (!hasAccess && req.user.role !== 'admin' && req.user.role !== 'manager') {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to the Membership group'
+      });
+    }
+    
+    const {
+      q,
+      first_name,
+      last_name,
+      phone,
+      email,
+      age_min,
+      age_max,
+      sexe,
+      region_id,
+      constituency_id,
+      station_id,
+      occupation,
+      page = 1,
+      limit = 25,
+      sort_by = 'name',
+      sort_order = 'asc'
+    } = req.query;
+    
+    const result = await memberModel.searchMembers({
+      q,
+      first_name,
+      last_name,
+      phone,
+      email,
+      age_min,
+      age_max,
+      sexe,
+      region_id,
+      constituency_id,
+      station_id,
+      occupation,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort_by,
+      sort_order
+    });
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createMember,
   getAllMembers,
   getMemberById,
   updateMember,
   deleteMember,
-  getMemberStats
+  getMemberStats,
+  searchMembers
 };
 
