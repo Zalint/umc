@@ -15,7 +15,7 @@ const state = {
     stations: [],
     participants: [],
     currentView: 'login',
-    currentTab: 'election' // 'election' or 'membership'
+    currentTab: 'election' // 'election', 'membership', or 'config'
 };
 
 // ============================================
@@ -268,11 +268,34 @@ function initializeTabs() {
     const groupNames = state.user.groups.map(g => g.name);
     const hasElection = groupNames.includes('Election');
     const hasMembership = groupNames.includes('Membership');
+    const isAdmin = state.user.role === 'admin';
+    const isManager = state.user.role === 'manager';
+    const canSeeConfig = isAdmin || isManager;
     
-    // Show tabs only if user has multiple groups or both groups
-    if (hasElection && hasMembership) {
+    // Determine which tabs to show
+    const tabsToShow = [];
+    if (hasElection) tabsToShow.push('election');
+    if (hasMembership) tabsToShow.push('membership');
+    if (canSeeConfig) tabsToShow.push('config');
+    
+    // Show tabs if user has multiple sections or can see config
+    if (tabsToShow.length > 1 || canSeeConfig) {
         headerTabs.style.display = 'flex';
         appTitle.style.display = 'none';
+        
+        // Hide tabs that user doesn't have access to
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            const tabName = btn.dataset.tab;
+            if (tabName === 'config' && !canSeeConfig) {
+                btn.style.display = 'none';
+            } else if (tabName === 'election' && !hasElection) {
+                btn.style.display = 'none';
+            } else if (tabName === 'membership' && !hasMembership) {
+                btn.style.display = 'none';
+            } else {
+                btn.style.display = 'block';
+            }
+        });
         
         // Set up tab click handlers
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -293,6 +316,12 @@ function initializeTabs() {
         } else if (hasMembership) {
             state.currentTab = 'membership';
             appTitle.textContent = 'Membership';
+        } else if (canSeeConfig) {
+            state.currentTab = 'config';
+            appTitle.textContent = 'Config';
+        } else if (isAdmin) {
+            state.currentTab = 'config';
+            appTitle.textContent = 'Config';
         }
     }
 }
@@ -310,6 +339,8 @@ function switchTab(tab) {
         navigateTo('dashboard');
     } else if (tab === 'membership') {
         navigateTo('member-register');
+    } else if (tab === 'config') {
+        navigateTo('projection-setup');
     }
 }
 
@@ -329,6 +360,8 @@ function updateTabDisplay() {
         appTitle.textContent = 'Election';
     } else if (state.currentTab === 'membership') {
         appTitle.textContent = 'Membership';
+    } else if (state.currentTab === 'config') {
+        appTitle.textContent = 'Config';
     }
 }
 
@@ -364,44 +397,84 @@ function buildMenu() {
         return;
     }
     
-    // Election menu items
-    const menuItems = {
-        admin: [
-            { label: 'Dashboard', view: 'dashboard', icon: iconDashboard() },
-            { label: 'Submit Results', view: 'submit', icon: iconEdit() },
-            { label: 'View Results', view: 'results', icon: iconChart() },
-            { label: 'Projection Results', view: 'projection-results', icon: iconTrendUp() },
-            { label: 'Projection Setup', view: 'projection-setup', icon: iconTarget() },
-            { label: 'Participants', view: 'participants', icon: iconUsers() },
-            { label: 'Users', view: 'users', icon: iconUser() },
-            { label: 'Geography', view: 'geography', icon: iconMap() },
-            { label: 'Active Sessions', view: 'sessions', icon: iconUser() },
-            { label: 'Audit Logs', view: 'audit', icon: iconList() },
-            { label: 'System Settings', view: 'settings', icon: iconSettings() }
-        ],
-        manager: [
-            { label: 'Dashboard', view: 'dashboard', icon: iconDashboard() },
-            { label: 'Submit Results', view: 'submit', icon: iconEdit() },
-            { label: 'View Results', view: 'results', icon: iconChart() },
-            { label: 'Projection Results', view: 'projection-results', icon: iconTrendUp() },
-            { label: 'Users', view: 'users', icon: iconUser() },
-            { label: 'Active Sessions', view: 'sessions', icon: iconUser() }
-        ],
+    // If config tab is active, show config menu (admin and manager)
+    if (currentTab === 'config') {
+        if (role !== 'admin' && role !== 'manager') {
+            navMenu.innerHTML = '<li><p style="padding: 1rem; color: var(--text-secondary);">Access denied</p></li>';
+            return;
+        }
+        
+        // Admin sees all config items
+        if (role === 'admin') {
+            const configMenuItems = [
+                { label: 'Projection Setup', view: 'projection-setup', icon: iconTarget() },
+                { label: 'Participants', view: 'participants', icon: iconUsers() },
+                { label: 'Users', view: 'users', icon: iconUser() },
+                { label: 'Geography', view: 'geography', icon: iconMap() },
+                { label: 'Active Sessions', view: 'sessions', icon: iconUser() },
+                { label: 'Audit Logs', view: 'audit', icon: iconList() },
+                { label: 'System Settings', view: 'settings', icon: iconSettings() }
+            ];
+            
+            navMenu.innerHTML = configMenuItems.map(item => `
+                <li>
+                    <a href="#" data-view="${item.view}">
+                        ${item.icon}
+                        ${item.label}
+                    </a>
+                </li>
+            `).join('');
+        } else if (role === 'manager') {
+            // Manager sees limited config items
+            const managerConfigItems = [
+                { label: 'Users', view: 'users', icon: iconUser() },
+                { label: 'Active Sessions', view: 'sessions', icon: iconUser() },
+                { label: 'Audit Logs', view: 'audit', icon: iconList() }
+            ];
+            
+            navMenu.innerHTML = managerConfigItems.map(item => `
+                <li>
+                    <a href="#" data-view="${item.view}">
+                        ${item.icon}
+                        ${item.label}
+                    </a>
+                </li>
+            `).join('');
+        }
+        
+        // Add event listeners
+        navMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const view = link.dataset.view;
+                navigateTo(view);
+                closeSidenav();
+            });
+        });
+        return;
+    }
+    
+    // Election menu items (common to all users with Election access)
+    const electionMenuItems = [
+        { label: 'Dashboard', view: 'dashboard', icon: iconDashboard() },
+        { label: 'Submit Results', view: 'submit', icon: iconEdit() },
+        { label: 'View Results', view: 'results', icon: iconChart() },
+        { label: 'Projection Results', view: 'projection-results', icon: iconTrendUp() }
+    ];
+    
+    // Role-specific additional items
+    const roleSpecificItems = {
         member: [
-            { label: 'Dashboard', view: 'dashboard', icon: iconDashboard() },
-            { label: 'My Stations', view: 'my-stations', icon: iconMap() },
-            { label: 'Submit Results', view: 'submit', icon: iconEdit() },
-            { label: 'View Results', view: 'results', icon: iconChart() }
+            { label: 'My Stations', view: 'my-stations', icon: iconMap() }
         ],
-        reader: [
-            { label: 'Dashboard', view: 'dashboard', icon: iconDashboard() },
-            { label: 'View Results', view: 'results', icon: iconChart() }
-        ]
+        reader: []
     };
     
-    const items = menuItems[role] || menuItems.reader;
+    // Build menu HTML
+    let menuHTML = '';
     
-    navMenu.innerHTML = items.map(item => `
+    // Add Election menu items (for all users)
+    menuHTML += electionMenuItems.map(item => `
         <li>
             <a href="#" data-view="${item.view}">
                 ${item.icon}
@@ -409,6 +482,20 @@ function buildMenu() {
             </a>
         </li>
     `).join('');
+    
+    // Add role-specific items
+    if (roleSpecificItems[role]) {
+        menuHTML += roleSpecificItems[role].map(item => `
+            <li>
+                <a href="#" data-view="${item.view}">
+                    ${item.icon}
+                    ${item.label}
+                </a>
+            </li>
+        `).join('');
+    }
+    
+    navMenu.innerHTML = menuHTML;
     
     // Add event listeners
     navMenu.querySelectorAll('a').forEach(link => {
@@ -495,6 +582,8 @@ function loadCurrentView() {
         default:
             if (state.currentTab === 'membership') {
                 showMemberRegistrationView();
+            } else if (state.currentTab === 'config') {
+                showProjectionSetupView();
             } else {
                 showDashboard();
             }
@@ -508,13 +597,20 @@ function loadCurrentView() {
 // Login View
 function showLoginView() {
     const content = document.getElementById('content');
-    document.getElementById('header').style.display = 'none';
+    const header = document.getElementById('header');
+    const sidenav = document.getElementById('sidenav');
+    const main = document.getElementById('main');
+    
+    // Hide header and sidebar on login
+    header.style.display = 'none';
+    sidenav.style.display = 'none';
+    main.style.marginLeft = '0';
     
     content.innerHTML = `
         <div style="max-width: 400px; margin: 40px auto; padding: 20px;">
             <div class="card">
                 <div style="text-align: center; margin-bottom: 24px;">
-                    <h1 style="color: var(--primary-color); margin-bottom: 8px;">Election Results</h1>
+                    <h1 style="color: var(--primary-color); margin-bottom: 8px;">UMC</h1>
                     <p class="text-muted">The Gambia</p>
                 </div>
                 <form id="loginForm">
@@ -1781,7 +1877,7 @@ async function showParticipantsView() {
     }
 }
 
-// Users View (Admin only)
+// Users View (Admin and Manager - Manager has limited access)
 async function showUsersView() {
     try {
         const [usersResponse, groupsResponse] = await Promise.all([
@@ -1790,11 +1886,15 @@ async function showUsersView() {
         ]);
         const users = usersResponse.data.users;
         const groups = groupsResponse.data.groups;
+        const isAdmin = state.user.role === 'admin';
+        const isManager = state.user.role === 'manager';
+        const canCreateUsers = isAdmin || isManager;
         
         const content = document.getElementById('content');
         content.innerHTML = `
             <h2 class="mb-2">User Management</h2>
             
+            ${canCreateUsers ? `
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Create New User</h3>
@@ -1850,8 +1950,9 @@ async function showUsersView() {
                     </form>
                 </div>
             </div>
+            ` : ''}
             
-            <div class="card mt-2">
+            <div class="card ${canCreateUsers ? 'mt-2' : ''}">
                 <div class="card-header">
                     <h3 class="card-title">All Users</h3>
                 </div>
@@ -1896,19 +1997,21 @@ async function showUsersView() {
                                                         style="margin-right: 0.5rem; margin-bottom: 0.5rem;">
                                                     ${u.is_active ? 'DEACTIVATE' : 'ACTIVATE'}
                                                 </button>
-                                                ${state.user.role === 'admin' ? `
+                                                ${canCreateUsers ? `
                                                     <button class="btn btn-warning btn-sm" 
                                                             onclick="showResetPasswordModal(${u.id}, '${u.full_name}')"
                                                             style="margin-right: 0.5rem; margin-bottom: 0.5rem;">
                                                         RESET PASSWORD
                                                     </button>
+                                                ` : ''}
+                                                ${isAdmin ? `
                                                     <button class="btn btn-info btn-sm" 
                                                             onclick="showUpdateGroupsModal(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')"
                                                             style="margin-right: 0.5rem; margin-bottom: 0.5rem;">
                                                         UPDATE GROUPS
                                                     </button>
                                                 ` : ''}
-                                                ${u.role === 'member' ? `
+                                                ${canCreateUsers && u.role === 'member' ? `
                                                     <button class="btn btn-outline btn-sm" 
                                                             onclick="showAssignMemberModal(${u.id}, '${u.full_name}')"
                                                             style="margin-bottom: 0.5rem;">
@@ -1926,59 +2029,62 @@ async function showUsersView() {
             </div>
         `;
         
-        // Handle role change - disable groups for admin
-        const roleSelect = document.getElementById('userRoleSelect');
-        const groupsSection = document.getElementById('groupsSection');
+        // Set up create user form if admin or manager
+        if (canCreateUsers) {
+            // Handle role change - disable groups for admin
+            const roleSelect = document.getElementById('userRoleSelect');
+            const groupsSection = document.getElementById('groupsSection');
         
-        roleSelect.addEventListener('change', (e) => {
-            const role = e.target.value;
-            const checkboxes = groupsSection.querySelectorAll('input[type="checkbox"]');
+            roleSelect.addEventListener('change', (e) => {
+                const role = e.target.value;
+                const checkboxes = groupsSection.querySelectorAll('input[type="checkbox"]');
+                
+                if (role === 'admin') {
+                    checkboxes.forEach(cb => {
+                        cb.checked = true;
+                        cb.disabled = true;
+                    });
+                    groupsSection.querySelector('small').textContent = 'Admin users automatically have access to all groups';
+                } else {
+                    checkboxes.forEach(cb => {
+                        cb.disabled = false;
+                    });
+                    groupsSection.querySelector('small').textContent = 'Select at least one group';
+                }
+            });
             
-            if (role === 'admin') {
-                checkboxes.forEach(cb => {
+            // Initialize based on default role
+            if (roleSelect.value === 'admin') {
+                groupsSection.querySelectorAll('input[type="checkbox"]').forEach(cb => {
                     cb.checked = true;
                     cb.disabled = true;
                 });
-                groupsSection.querySelector('small').textContent = 'Admin users automatically have access to all groups';
-            } else {
-                checkboxes.forEach(cb => {
-                    cb.disabled = false;
-                });
-                groupsSection.querySelector('small').textContent = 'Select at least one group';
             }
-        });
-        
-        // Initialize based on default role
-        if (roleSelect.value === 'admin') {
-            groupsSection.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-                cb.checked = true;
-                cb.disabled = true;
+            
+            // Handle create user form
+            document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                
+                // Get selected group IDs
+                const groupIds = Array.from(formData.getAll('group_ids')).map(id => parseInt(id));
+                
+                try {
+                    await api.post('/auth/register', {
+                        email: formData.get('email'),
+                        password: formData.get('password'),
+                        full_name: formData.get('full_name'),
+                        role: formData.get('role'),
+                        group_ids: groupIds
+                    });
+                    
+                    showToast('User created successfully!', 'success');
+                    showUsersView(); // Reload
+                } catch (error) {
+                    showToast(error.message || 'Failed to create user', 'error');
+                }
             });
         }
-        
-        // Handle create user form
-        document.getElementById('createUserForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            
-            // Get selected group IDs
-            const groupIds = Array.from(formData.getAll('group_ids')).map(id => parseInt(id));
-            
-            try {
-                await api.post('/auth/register', {
-                    email: formData.get('email'),
-                    password: formData.get('password'),
-                    full_name: formData.get('full_name'),
-                    role: formData.get('role'),
-                    group_ids: groupIds
-                });
-                
-                showToast('User created successfully!', 'success');
-                showUsersView(); // Reload
-            } catch (error) {
-                showToast(error.message || 'Failed to create user', 'error');
-            }
-        });
         
     } catch (error) {
         showToast('Failed to load users', 'error');
@@ -3479,16 +3585,31 @@ async function initializeApp() {
         }
         
         // User is active, proceed normally
-        document.getElementById('header').style.display = 'block';
+        const header = document.getElementById('header');
+        const sidenav = document.getElementById('sidenav');
+        const main = document.getElementById('main');
+        
+        // Show header and sidebar after login
+        header.style.display = 'block';
+        sidenav.style.display = 'block';
+        // Reset margin (will be set by initializeNavigation if needed)
+        main.style.marginLeft = '';
+        
         initializeNavigation();
         
         // Determine default view based on user groups
         const groupNames = state.user.groups ? state.user.groups.map(g => g.name) : [];
         const hasElection = groupNames.includes('Election');
         const hasMembership = groupNames.includes('Membership');
+        const isAdmin = state.user.role === 'admin';
+        const isManager = state.user.role === 'manager';
         
         // Set default view based on available groups
-        if (hasMembership && !hasElection) {
+        if (isAdmin || isManager) {
+            // Admin and Manager always start on Election tab
+            state.currentTab = 'election';
+            navigateTo('dashboard');
+        } else if (hasMembership && !hasElection) {
             // User only has Membership group - show member registration
             state.currentTab = 'membership';
             navigateTo('member-register');
