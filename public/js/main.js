@@ -9,11 +9,13 @@
 const state = {
     token: null,
     user: null,
+    userGroups: [],
     regions: [],
     constituencies: [],
     stations: [],
     participants: [],
-    currentView: 'login'
+    currentView: 'login',
+    currentTab: 'election' // 'election' or 'membership'
 };
 
 // ============================================
@@ -240,16 +242,129 @@ function initializeNavigation() {
         userInfo.textContent = state.user.full_name;
         logoutBtn.style.display = 'flex';
         refreshBtn.style.display = 'flex';
+        
+        // Initialize tabs if user has groups
+        if (state.user.groups && state.user.groups.length > 0) {
+            initializeTabs();
+        }
     }
     
-    // Build menu based on role
+    // Build menu based on role and current tab
     buildMenu();
+}
+
+// Initialize tabs
+function initializeTabs() {
+    const headerTabs = document.getElementById('headerTabs');
+    const appTitle = document.getElementById('appTitle');
+    
+    if (!state.user || !state.user.groups || state.user.groups.length === 0) {
+        headerTabs.style.display = 'none';
+        appTitle.style.display = 'block';
+        return;
+    }
+    
+    // Get group names
+    const groupNames = state.user.groups.map(g => g.name);
+    const hasElection = groupNames.includes('Election');
+    const hasMembership = groupNames.includes('Membership');
+    
+    // Show tabs only if user has multiple groups or both groups
+    if (hasElection && hasMembership) {
+        headerTabs.style.display = 'flex';
+        appTitle.style.display = 'none';
+        
+        // Set up tab click handlers
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tab = e.target.dataset.tab;
+                switchTab(tab);
+            });
+        });
+        
+        // Set active tab based on state
+        updateTabDisplay();
+    } else {
+        headerTabs.style.display = 'none';
+        appTitle.style.display = 'block';
+        if (hasElection) {
+            state.currentTab = 'election';
+            appTitle.textContent = 'Election';
+        } else if (hasMembership) {
+            state.currentTab = 'membership';
+            appTitle.textContent = 'Membership';
+        }
+    }
+}
+
+// Switch between tabs
+function switchTab(tab) {
+    if (tab === state.currentTab) return;
+    
+    state.currentTab = tab;
+    updateTabDisplay();
+    buildMenu();
+    
+    // Navigate to default view for the tab
+    if (tab === 'election') {
+        navigateTo('dashboard');
+    } else if (tab === 'membership') {
+        navigateTo('member-register');
+    }
+}
+
+// Update tab display
+function updateTabDisplay() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.dataset.tab === state.currentTab) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // Update app title
+    const appTitle = document.getElementById('appTitle');
+    if (state.currentTab === 'election') {
+        appTitle.textContent = 'Election';
+    } else if (state.currentTab === 'membership') {
+        appTitle.textContent = 'Membership';
+    }
 }
 
 function buildMenu() {
     const navMenu = document.getElementById('navMenu');
     const role = state.user?.role;
+    const currentTab = state.currentTab;
     
+    // If membership tab is active, show membership menu
+    if (currentTab === 'membership') {
+        const membershipMenuItems = [
+            { label: 'Member', view: 'member-register', icon: iconUser() }
+        ];
+        
+        navMenu.innerHTML = membershipMenuItems.map(item => `
+            <li>
+                <a href="#" data-view="${item.view}">
+                    ${item.icon}
+                    ${item.label}
+                </a>
+            </li>
+        `).join('');
+        
+        // Add event listeners
+        navMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const view = link.dataset.view;
+                navigateTo(view);
+                closeSidenav();
+            });
+        });
+        return;
+    }
+    
+    // Election menu items
     const menuItems = {
         admin: [
             { label: 'Dashboard', view: 'dashboard', icon: iconDashboard() },
@@ -374,8 +489,15 @@ function loadCurrentView() {
         case 'projection-setup':
             showProjectionSetupView();
             break;
+        case 'member-register':
+            showMemberRegistrationView();
+            break;
         default:
-            showDashboard();
+            if (state.currentTab === 'membership') {
+                showMemberRegistrationView();
+            } else {
+                showDashboard();
+            }
     }
 }
 
@@ -404,7 +526,7 @@ function showLoginView() {
                     <div class="form-group">
                         <label class="form-label">Password</label>
                         <div style="position: relative;">
-                            <input type="password" class="form-control" id="loginPassword" required 
+                            <input type="password" class="form-control" id="loginPassword" required autocomplete="current-password" 
                                    autocomplete="current-password" placeholder="Enter your password"
                                    style="padding-right: 2.5rem;">
                             <button type="button" onclick="togglePasswordVisibility('loginPassword', 'loginPasswordToggle')" 
@@ -1662,8 +1784,12 @@ async function showParticipantsView() {
 // Users View (Admin only)
 async function showUsersView() {
     try {
-        const response = await api.get('/users');
-        const users = response.data.users;
+        const [usersResponse, groupsResponse] = await Promise.all([
+            api.get('/users'),
+            api.get('/groups')
+        ]);
+        const users = usersResponse.data.users;
+        const groups = groupsResponse.data.groups;
         
         const content = document.getElementById('content');
         content.innerHTML = `
@@ -1686,7 +1812,7 @@ async function showUsersView() {
                         <div class="form-group">
                             <label class="form-label">Password</label>
                             <div style="position: relative;">
-                                <input type="password" class="form-control" name="password" id="createUserPassword" required minlength="6" style="padding-right: 2.5rem;">
+                                <input type="password" class="form-control" name="password" id="createUserPassword" required minlength="6" autocomplete="new-password" style="padding-right: 2.5rem;">
                                 <button type="button" onclick="togglePasswordVisibility('createUserPassword', 'createUserPasswordToggle')" 
                                         id="createUserPasswordToggle"
                                         style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); 
@@ -1697,12 +1823,28 @@ async function showUsersView() {
                         </div>
                         <div class="form-group">
                             <label class="form-label">Role</label>
-                            <select class="form-control form-select" name="role" required>
+                            <select class="form-control form-select" name="role" id="userRoleSelect" required>
                                 <option value="admin">Admin</option>
                                 <option value="manager">Manager</option>
                                 <option value="member" selected>Member</option>
                                 <option value="reader">Reader</option>
                             </select>
+                        </div>
+                        <div class="form-group" id="groupsSection">
+                            <label class="form-label">Groups</label>
+                            <div id="groupsCheckboxes">
+                                ${groups.map(g => `
+                                    <div style="margin-bottom: 0.5rem;">
+                                        <label style="display: flex; align-items: center; cursor: pointer;">
+                                            <input type="checkbox" name="group_ids" value="${g.id}" 
+                                                   ${g.name === 'Election' ? 'checked' : ''}
+                                                   style="margin-right: 0.5rem; width: 18px; height: 18px; cursor: pointer;">
+                                            ${g.name}
+                                        </label>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <small class="form-text">Admin users automatically have access to all groups</small>
                         </div>
                         <button type="submit" class="btn btn-primary btn-full">Create User</button>
                     </form>
@@ -1721,6 +1863,7 @@ async function showUsersView() {
                                     <th>Name</th>
                                     <th>Username</th>
                                     <th>Role</th>
+                                    <th>Groups</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -1729,12 +1872,17 @@ async function showUsersView() {
                                 ${users.map(u => {
                                     const isCurrentUser = u.id === state.user.id;
                                     const username = u.email.split('@')[0]; // Extract username before @
+                                    const userGroups = u.groups || [];
+                                    const groupNames = userGroups.map(g => g.name).join(', ') || 'None';
                                     return `
                                     <tr>
                                         <td data-label="Name">${u.full_name}</td>
                                         <td data-label="Username">${username}</td>
                                         <td data-label="Role">
                                             <span class="badge badge-${u.role === 'admin' ? 'danger' : u.role === 'manager' ? 'primary' : 'success'}">${u.role}</span>
+                                        </td>
+                                        <td data-label="Groups">
+                                            <span style="font-size: 0.875rem;">${groupNames}</span>
                                         </td>
                                         <td data-label="Status">
                                             <span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">
@@ -1753,6 +1901,11 @@ async function showUsersView() {
                                                             onclick="showResetPasswordModal(${u.id}, '${u.full_name}')"
                                                             style="margin-right: 0.5rem; margin-bottom: 0.5rem;">
                                                         RESET PASSWORD
+                                                    </button>
+                                                    <button class="btn btn-info btn-sm" 
+                                                            onclick="showUpdateGroupsModal(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')"
+                                                            style="margin-right: 0.5rem; margin-bottom: 0.5rem;">
+                                                        UPDATE GROUPS
                                                     </button>
                                                 ` : ''}
                                                 ${u.role === 'member' ? `
@@ -1773,17 +1926,51 @@ async function showUsersView() {
             </div>
         `;
         
+        // Handle role change - disable groups for admin
+        const roleSelect = document.getElementById('userRoleSelect');
+        const groupsSection = document.getElementById('groupsSection');
+        
+        roleSelect.addEventListener('change', (e) => {
+            const role = e.target.value;
+            const checkboxes = groupsSection.querySelectorAll('input[type="checkbox"]');
+            
+            if (role === 'admin') {
+                checkboxes.forEach(cb => {
+                    cb.checked = true;
+                    cb.disabled = true;
+                });
+                groupsSection.querySelector('small').textContent = 'Admin users automatically have access to all groups';
+            } else {
+                checkboxes.forEach(cb => {
+                    cb.disabled = false;
+                });
+                groupsSection.querySelector('small').textContent = 'Select at least one group';
+            }
+        });
+        
+        // Initialize based on default role
+        if (roleSelect.value === 'admin') {
+            groupsSection.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+                cb.disabled = true;
+            });
+        }
+        
         // Handle create user form
         document.getElementById('createUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
+            
+            // Get selected group IDs
+            const groupIds = Array.from(formData.getAll('group_ids')).map(id => parseInt(id));
             
             try {
                 await api.post('/auth/register', {
                     email: formData.get('email'),
                     password: formData.get('password'),
                     full_name: formData.get('full_name'),
-                    role: formData.get('role')
+                    role: formData.get('role'),
+                    group_ids: groupIds
                 });
                 
                 showToast('User created successfully!', 'success');
@@ -1813,6 +2000,90 @@ function togglePasswordVisibility(inputId, buttonId) {
 }
 
 // Show reset password modal
+// Show update groups modal
+async function showUpdateGroupsModal(userId, userName) {
+    try {
+        // Get all available groups and user details
+        const [groupsResponse, userResponse] = await Promise.all([
+            api.get('/groups'),
+            api.get(`/users/${userId}`)
+        ]);
+        
+        const allGroups = groupsResponse.data.groups;
+        const user = userResponse.data.user;
+        const isAdmin = user.role === 'admin';
+        
+        // Get current group IDs
+        const currentGroups = user.groups || [];
+        const currentGroupIds = currentGroups.map(g => g.id);
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3 class="modal-title">Update Groups: ${userName}</h3>
+                    <button class="modal-close" onclick="this.closest('.modal-backdrop').remove()">×</button>
+                </div>
+                <div class="modal-body">
+                    ${isAdmin ? `
+                        <div class="alert alert-info" style="margin-bottom: 1rem;">
+                            <strong>Note:</strong> Admin users automatically have access to all groups and cannot be modified.
+                        </div>
+                    ` : ''}
+                    <form id="updateGroupsForm">
+                        <div class="form-group">
+                            <label class="form-label">Groups</label>
+                            <div id="updateGroupsCheckboxes">
+                                ${allGroups.map(g => {
+                                    const isChecked = currentGroupIds.includes(g.id);
+                                    return `
+                                        <div style="margin-bottom: 0.5rem;">
+                                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                                <input type="checkbox" name="group_ids" value="${g.id}" 
+                                                       ${isChecked ? 'checked' : ''}
+                                                       ${isAdmin ? 'disabled' : ''}
+                                                       style="margin-right: 0.5rem; width: 18px; height: 18px; cursor: pointer;">
+                                                ${g.name}
+                                            </label>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            ${!isAdmin ? '<small class="form-text">Select at least one group</small>' : ''}
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                            <button type="submit" class="btn btn-primary" style="flex: 1;" ${isAdmin ? 'disabled' : ''}>Update Groups</button>
+                            <button type="button" class="btn btn-outline" onclick="this.closest('.modal-backdrop').remove()" style="flex: 1;">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Handle form submission
+        document.getElementById('updateGroupsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const groupIds = Array.from(formData.getAll('group_ids')).map(id => parseInt(id));
+            
+            try {
+                await api.put(`/groups/user/${userId}`, { group_ids: groupIds });
+                showToast('Groups updated successfully!', 'success');
+                modal.remove();
+                showUsersView(); // Reload user list
+            } catch (error) {
+                showToast(error.message || 'Failed to update groups', 'error');
+            }
+        });
+    } catch (error) {
+        showToast('Failed to load groups', 'error');
+        console.error('Update Groups Modal Error:', error);
+    }
+}
+
 function showResetPasswordModal(userId, userName) {
     const modal = document.createElement('div');
     modal.className = 'modal-backdrop';
@@ -1827,7 +2098,7 @@ function showResetPasswordModal(userId, userName) {
                     <div class="form-group">
                         <label class="form-label">New Password</label>
                         <div style="position: relative;">
-                            <input type="password" class="form-control" id="resetNewPassword" name="newPassword" 
+                            <input type="password" class="form-control" id="resetNewPassword" name="newPassword" autocomplete="new-password" 
                                    required minlength="6" placeholder="Enter new password"
                                    style="padding-right: 2.5rem;">
                             <button type="button" onclick="togglePasswordVisibility('resetNewPassword', 'resetPasswordToggle')" 
@@ -1842,7 +2113,7 @@ function showResetPasswordModal(userId, userName) {
                     <div class="form-group">
                         <label class="form-label">Confirm New Password</label>
                         <div style="position: relative;">
-                            <input type="password" class="form-control" id="resetConfirmPassword" name="confirmPassword" 
+                            <input type="password" class="form-control" id="resetConfirmPassword" name="confirmPassword" autocomplete="new-password" 
                                    required minlength="6" placeholder="Confirm new password"
                                    style="padding-right: 2.5rem;">
                             <button type="button" onclick="togglePasswordVisibility('resetConfirmPassword', 'resetConfirmPasswordToggle')" 
@@ -2123,6 +2394,7 @@ async function removeAssignment(assignmentId, userId) {
 // Make functions globally accessible
 window.showAssignMemberModal = showAssignMemberModal;
 window.removeAssignment = removeAssignment;
+window.showUpdateGroupsModal = showUpdateGroupsModal;
 
 // Geography View (Admin)
 async function showGeographyView() {
@@ -2959,6 +3231,154 @@ async function toggleStation(stationId, isSelected) {
 }
 
 // ============================================
+// Member Registration View
+// ============================================
+async function showMemberRegistrationView() {
+    try {
+        // Load geography data if not already loaded
+        await loadGeographyData();
+        
+        const content = document.getElementById('content');
+        content.innerHTML = `
+            <h2 class="mb-2">Member Registration</h2>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Register New Member</h3>
+                </div>
+                <div class="card-body">
+                    <form id="memberRegistrationForm">
+                        <div class="form-group">
+                            <label class="form-label">First Name <span class="text-error">*</span></label>
+                            <input type="text" class="form-control" name="first_name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Last Name <span class="text-error">*</span></label>
+                            <input type="text" class="form-control" name="last_name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Phone <span class="text-error">*</span></label>
+                            <input type="tel" class="form-control" name="phone" 
+                                   placeholder="+220 XXX XXXX or XXX XXXX" required>
+                            <small class="form-text">Gambia format: +220 followed by 7 digits</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Age <span class="text-error">*</span></label>
+                            <input type="number" class="form-control" name="age" min="1" max="150" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Sexe/Gender <span class="text-error">*</span></label>
+                            <select class="form-control form-select" name="sexe" required>
+                                <option value="">Select...</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Occupation <span class="text-error">*</span></label>
+                            <input type="text" class="form-control" name="occupation" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Region <span class="text-error">*</span></label>
+                            <select class="form-control form-select" name="region_id" id="regionSelect" required>
+                                <option value="">Select Region...</option>
+                                ${state.regions.map(r => `
+                                    <option value="${r.id}">${r.name}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Constituency <span class="text-error">*</span></label>
+                            <select class="form-control form-select" name="constituency_id" id="constituencySelect" required>
+                                <option value="">Select Constituency...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Station <span class="text-error">*</span></label>
+                            <select class="form-control form-select" name="station_id" id="stationSelect" required>
+                                <option value="">Select Station...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Comment</label>
+                            <textarea class="form-control" name="comment" rows="4" 
+                                      placeholder="General information or notes..."></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-full">Register Member</button>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        // Set up cascading dropdowns
+        const regionSelect = document.getElementById('regionSelect');
+        const constituencySelect = document.getElementById('constituencySelect');
+        const stationSelect = document.getElementById('stationSelect');
+        
+        regionSelect.addEventListener('change', (e) => {
+            const regionId = parseInt(e.target.value);
+            const filteredConstituencies = state.constituencies.filter(c => c.region_id === regionId);
+            
+            constituencySelect.innerHTML = '<option value="">Select Constituency...</option>' +
+                filteredConstituencies.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            
+            stationSelect.innerHTML = '<option value="">Select Station...</option>';
+        });
+        
+        constituencySelect.addEventListener('change', (e) => {
+            const constituencyId = parseInt(e.target.value);
+            const filteredStations = state.stations.filter(s => s.constituency_id === constituencyId);
+            
+            stationSelect.innerHTML = '<option value="">Select Station...</option>' +
+                filteredStations.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        });
+        
+        // Handle form submission
+        document.getElementById('memberRegistrationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                await api.post('/members', {
+                    first_name: formData.get('first_name'),
+                    last_name: formData.get('last_name'),
+                    phone: formData.get('phone'),
+                    age: parseInt(formData.get('age')),
+                    sexe: formData.get('sexe'),
+                    occupation: formData.get('occupation'),
+                    region_id: parseInt(formData.get('region_id')),
+                    constituency_id: parseInt(formData.get('constituency_id')),
+                    station_id: parseInt(formData.get('station_id')),
+                    comment: formData.get('comment') || null
+                });
+                
+                showToast('Member registered successfully!', 'success');
+                e.target.reset();
+                constituencySelect.innerHTML = '<option value="">Select Constituency...</option>';
+                stationSelect.innerHTML = '<option value="">Select Station...</option>';
+            } catch (error) {
+                showToast(error.message || 'Failed to register member', 'error');
+            }
+        });
+        
+    } catch (error) {
+        showToast('Failed to load member registration form', 'error');
+        console.error('Member Registration Error:', error);
+    }
+}
+
+// ============================================
 // SVG Icons
 // ============================================
 function iconDashboard() {
@@ -3061,7 +3481,25 @@ async function initializeApp() {
         // User is active, proceed normally
         document.getElementById('header').style.display = 'block';
         initializeNavigation();
-        navigateTo('dashboard');
+        
+        // Determine default view based on user groups
+        const groupNames = state.user.groups ? state.user.groups.map(g => g.name) : [];
+        const hasElection = groupNames.includes('Election');
+        const hasMembership = groupNames.includes('Membership');
+        
+        // Set default view based on available groups
+        if (hasMembership && !hasElection) {
+            // User only has Membership group - show member registration
+            state.currentTab = 'membership';
+            navigateTo('member-register');
+        } else if (hasElection) {
+            // User has Election group (with or without Membership) - show dashboard
+            state.currentTab = 'election';
+            navigateTo('dashboard');
+        } else {
+            // Fallback to dashboard
+            navigateTo('dashboard');
+        }
     } catch (error) {
         // If verification fails, logout
         console.error('Failed to verify user status:', error);

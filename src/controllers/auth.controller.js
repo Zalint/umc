@@ -51,8 +51,14 @@ const login = async (req, res, next) => {
       id: user.id,
       email: user.email,
       full_name: user.full_name,
-      role: user.role
+      role: user.role,
+      is_active: user.is_active
     };
+    
+    // Get user groups
+    const { groupModel } = require('../models');
+    const groups = await groupModel.getUserGroups(user.id);
+    userData.groups = groups;
     
     if (user.role === ROLES.MEMBER) {
       const userWithAssignments = await userModel.getUserWithAssignments(user.id);
@@ -142,6 +148,40 @@ const register = async (req, res, next) => {
       role
     });
     
+    // Assign groups to user
+    const { groupModel } = require('../models');
+    let assignedGroups = [];
+    
+    if (role === 'admin') {
+      // Admin gets both groups automatically
+      const allGroups = await groupModel.getAllGroups();
+      const allGroupIds = allGroups.map(g => g.id);
+      assignedGroups = await groupModel.assignGroupsToUser(newUser.id, allGroupIds);
+    } else {
+      // Other roles: assign groups from request, or default to Election
+      const { group_ids } = req.body;
+      
+      if (group_ids && Array.isArray(group_ids) && group_ids.length > 0) {
+        // Validate group IDs exist
+        for (const groupId of group_ids) {
+          const group = await groupModel.getGroupById(groupId);
+          if (!group) {
+            return res.status(400).json({
+              success: false,
+              message: `Group with ID ${groupId} not found`
+            });
+          }
+        }
+        assignedGroups = await groupModel.assignGroupsToUser(newUser.id, group_ids);
+      } else {
+        // Default to Election group
+        const electionGroup = await groupModel.getGroupByName('Election');
+        if (electionGroup) {
+          assignedGroups = await groupModel.assignGroupsToUser(newUser.id, [electionGroup.id]);
+        }
+      }
+    }
+    
     // Log the action to audit (if created by an authenticated admin)
     if (req.user) {
       const ipAddress = req.ip || req.connection.remoteAddress;
@@ -159,7 +199,10 @@ const register = async (req, res, next) => {
       success: true,
       message: 'User registered successfully',
       data: {
-        user: newUser
+        user: {
+          ...newUser,
+          groups: assignedGroups
+        }
       }
     });
     
@@ -177,6 +220,10 @@ const getCurrentUser = async (req, res, next) => {
     // req.user is set by auth middleware
     const user = await userModel.findUserById(req.user.id);
     
+    // Get user groups
+    const { groupModel } = require('../models');
+    const groups = await groupModel.getUserGroups(req.user.id);
+    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -185,10 +232,10 @@ const getCurrentUser = async (req, res, next) => {
     }
     
     // Get assignments if member
-    let userData = user;
+    let userData = { ...user, groups };
     if (user.role === ROLES.MEMBER) {
       const userWithAssignments = await userModel.getUserWithAssignments(user.id);
-      userData = { ...user, assignments: userWithAssignments.assignments || [] };
+      userData = { ...userData, assignments: userWithAssignments.assignments || [] };
     }
     
     res.json({

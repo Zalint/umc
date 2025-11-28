@@ -14,10 +14,22 @@ const getAllUsers = async (req, res, next) => {
   try {
     const users = await userModel.getAllUsers();
     
+    // Get groups for each user
+    const { groupModel } = require('../models');
+    const usersWithGroups = await Promise.all(
+      users.map(async (user) => {
+        const groups = await groupModel.getUserGroups(user.id);
+        return {
+          ...user,
+          groups
+        };
+      })
+    );
+    
     res.json({
       success: true,
       data: {
-        users
+        users: usersWithGroups
       }
     });
   } catch (error) {
@@ -42,15 +54,24 @@ const getUserById = async (req, res, next) => {
       });
     }
     
-    // Get assignments
-    const assignments = await memberModel.getUserAssignments(id);
+    // Get assignments (only for member role)
+    let assignments = [];
+    if (user.role === 'member') {
+      const userWithAssignments = await userModel.getUserWithAssignments(id);
+      assignments = userWithAssignments.assignments || [];
+    }
+    
+    // Get groups
+    const { groupModel } = require('../models');
+    const groups = await groupModel.getUserGroups(id);
     
     res.json({
       success: true,
       data: {
         user: {
           ...user,
-          assignments
+          assignments,
+          groups
         }
       }
     });

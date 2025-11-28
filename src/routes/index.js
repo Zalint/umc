@@ -15,6 +15,8 @@ const attachmentRoutes = require('./attachment.routes');
 const auditRoutes = require('./audit.routes');
 const projectionRoutes = require('./projection.routes');
 const sessionRoutes = require('./session.routes');
+const groupRoutes = require('./group.routes');
+const memberRoutes = require('./member.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -26,6 +28,8 @@ router.use('/attachments', attachmentRoutes);
 router.use('/audit', auditRoutes);
 router.use('/projections', projectionRoutes);
 router.use('/sessions', sessionRoutes);
+router.use('/groups', groupRoutes);
+router.use('/members', memberRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
